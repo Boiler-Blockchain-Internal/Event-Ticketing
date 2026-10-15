@@ -1,0 +1,11 @@
+{
+  "name": "passmark",
+  "private": true,
+  "workspaces": ["web", "contracts"],
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "compile": "npm run compile -w contracts",
+    "test:contracts": "npm test -w contracts"
+  }
+}
