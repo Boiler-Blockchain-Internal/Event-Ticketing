@@ -1,7 +1,11 @@
 {
   "name": "passmark",
   "private": true,
-  "workspaces": ["web", "contracts"],
+  "type": "module",
+  "workspaces": [
+    "web",
+    "contracts"
+  ],
   "scripts": {
     "dev": "npm run dev -w web",
     "build": "npm run build -w web",

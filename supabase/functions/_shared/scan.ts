@@ -1,4 +1,4 @@
-import { MAX_AGE, readPass, ticketLabel, type ScanResult } from '../web/src/pass.ts'
+import { MAX_AGE, readPass, ticketLabel, type ScanResult } from './pass.ts'
 
 // Server-side door check. Runtime-agnostic: wrap in a Supabase edge function or a Node route
 // once that decision is made. Storage comes in through `deps` (see supabase.ts).

@@ -1,10 +1,41 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
+import type { Hex } from 'viem'
 import { Qr, useRotation } from '../components/Qr'
 import { event, history, membership, myTicket } from '../data'
+import { makePass } from '../../../supabase/functions/_shared/pass.ts'
+
+// ponytail: demo signing key kept in this browser until the embedded-wallet provider is picked; swap for its signer.
+function demoSigner() {
+  let key: string | null = null
+  try { key = localStorage.getItem('passmark-demo-key') } catch { /* private mode */ }
+  if (!key) {
+    key = generatePrivateKey()
+    try { localStorage.setItem('passmark-demo-key', key) } catch { /* ephemeral key is fine */ }
+  }
+  return privateKeyToAccount(key as Hex)
+}
+const signer = demoSigner()
+const credentialId = myTicket.id.replace(/\D/g, '').replace(/^0+/, '')
+
+// Fresh signed code every rotation, and again when the phone wakes (a backgrounded tab may hold an expired one).
+function usePassCode(version: number) {
+  const [code, setCode] = useState<string>()
+  useEffect(() => {
+    let live = true
+    const refresh = () => makePass(signer, credentialId, event.id).then(c => live && setCode(c))
+    refresh()
+    const onWake = () => document.visibilityState === 'visible' && refresh()
+    document.addEventListener('visibilitychange', onWake)
+    return () => { live = false; document.removeEventListener('visibilitychange', onWake) }
+  }, [version])
+  return code
+}
 
 export function Tickets() {
   const [tab, setTab] = useState<'passes' | 'history'>('passes')
   const { label, version } = useRotation()
+  const code = usePassCode(version)
 
   return (
     <main className="app">
@@ -27,7 +58,7 @@ export function Tickets() {
             <div className="ticket-top"><span>EVENT TICKET</span><span>{myTicket.id}</span></div>
             <h3>{event.name}</h3>
             <p className="ticket-meta">{event.org} · {event.shortDate} · {event.venue}</p>
-            <Qr size={21} version={version} label={`Pass ${myTicket.id}, refreshes every 30 seconds`} />
+            <Qr size={21} version={version} value={code} label={`Pass ${myTicket.id}, refreshes every 30 seconds`} />
             <div className="ticket-bar"><span key={version} /></div>
             <div className="ticket-foot"><span>New code in {label}</span><span>Screenshots won't work</span></div>
             <p className="ticket-hint">

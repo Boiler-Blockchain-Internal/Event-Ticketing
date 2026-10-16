@@ -8,12 +8,17 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 
 ## Layout
 
-- `package.json`: npm workspaces root (`web`, `contracts`). `contracts/` does not exist yet.
+- `package.json`: npm workspaces root (`web`, `contracts`).
 - `web/`: Vite + React 19 + TypeScript SPA. **Not Next.js** (the Notion doc says Next.js; the repo chose Vite).
   - `src/router.ts`: hash routing via `useSyncExternalStore`. No react-router.
   - `src/data.ts`: mock data, stands in until the backend and contract exist.
   - `src/verify.ts`: door-side scan check. Local stand-in for the real backend check.
   - `src/pages/`, `src/components/`: screens and UI pieces (`Qr.tsx`, `HeroTicket.tsx`, `Logo.tsx`).
+- `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
+- `supabase/functions/scan/`: the scan edge function (`verify_jwt = false` in `config.toml`; the staff token is the auth).
+- `scripts/staff-link.ts`: prints a door-staff link until the admin dashboard exists.
+- `supabase/migrations/`: Postgres schema, RLS, and the atomic `check_in` function.
+- `contracts/`: Hardhat 3 + viem (not Foundry). No contract yet.
 - `index.html` (root): static marketing page with the design tokens (`--bg`, `--accent`, `--amber`, `--red`, Geist fonts). Reuse these tokens in `web/`.
 
 ## Commands
@@ -22,7 +27,7 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 npm install            # from repo root
 npm run dev            # web dev server
 npm run build          # tsc -b && vite build
-node --test "web/src/**/*.test.ts"   # unit tests (node:test runs .ts directly, Node 23.6+)
+npm test -w web          # unit tests, web + server (node:test runs .ts directly, Node 23.6+)
 ```
 
 ## Conventions
@@ -58,7 +63,10 @@ node --test "web/src/**/*.test.ts"   # unit tests (node:test runs .ts directly, 
 
 Out of scope: payments, resale/marketplace, multi-chain, native apps. Stretch only after the Month 2 gate: offline allowlist, Apple/Google Wallet passes, external wallet linking, transfers, analytics.
 
+## Decided
+
+- Backend: Supabase edge functions (Deno). Shared logic in `supabase/functions/_shared/`.
+
 ## Open decisions (do not assume; ask)
 
 - Wallet provider, Base vs Optimism final pick, mainnet vs testnet for the pilot.
-- Where the backend lives (Supabase edge functions vs a small Node service) now that the web app is a static Vite SPA.

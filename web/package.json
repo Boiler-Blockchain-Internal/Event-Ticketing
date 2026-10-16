@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && tsc -p ../supabase/functions/_shared && vite build",
     "preview": "vite preview",
-    "test": "node --test src/verify.test.ts"
+    "test": "node --test src/*.test.ts ../supabase/functions/_shared/*.test.ts"
   },
   "dependencies": {
     "qrcode-generator": "^2.0.4",

@@ -1,0 +1,5 @@
+project_id = "passmark"
+
+# The scan page is used by door staff with no Supabase session; the function checks its own staff token.
+[functions.scan]
+verify_jwt = false

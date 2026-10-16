@@ -4,3 +4,4 @@ contracts/artifacts
 contracts/cache
 contracts/types
 .env
+.env.local

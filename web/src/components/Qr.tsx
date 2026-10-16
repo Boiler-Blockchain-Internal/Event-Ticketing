@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-
-export const REFRESH = 30
+import qrcode from 'qrcode-generator'
+import { REFRESH } from '../../../supabase/functions/_shared/pass.ts'
 
 // Ticks a countdown and bumps `version` every REFRESH seconds, like the real rotating pass.
 export function useRotation() {
@@ -17,8 +17,15 @@ export function useRotation() {
   return { left, version, label: `0:${String(left).padStart(2, '0')}` }
 }
 
-// Decorative QR: finder patterns plus random modules. Change `version` to redraw.
-// ponytail: not a scannable QR, swap for a real encoder once there's a signed payload to show.
+// Real modules for `value`; without it, a decorative QR (finder patterns plus random modules) for marketing.
+function encode(value: string): { n: number; grid: boolean[] } {
+  const qr = qrcode(0, 'M')
+  qr.addData(value)
+  qr.make()
+  const n = qr.getModuleCount()
+  return { n, grid: Array.from({ length: n * n }, (_, i) => qr.isDark(Math.floor(i / n), i % n)) }
+}
+
 function cells(n: number): boolean[] {
   const corners = [[0, 0], [0, n - 7], [n - 7, 0]]
   const nearFinder = (r: number, c: number) => (r < 8 && c < 8) || (r < 8 && c > n - 9) || (r > n - 9 && c < 8)
@@ -35,10 +42,10 @@ function cells(n: number): boolean[] {
   })
 }
 
-export function Qr({ size, version = 0, label }: { size: number; version?: number; label?: string }) {
-  const grid = useMemo(() => cells(size), [size, version])
+export function Qr({ size, version = 0, label, value }: { size: number; version?: number; label?: string; value?: string }) {
+  const { n, grid } = useMemo(() => value ? encode(value) : { n: size, grid: cells(size) }, [size, version, value])
   return (
-    <div className="qr" style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}
+    <div className="qr" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}
       role={label ? 'img' : undefined} aria-label={label} aria-hidden={!label}>
       {grid.map((on, i) => <i key={i} className={on ? 'on' : undefined} />)}
     </div>
