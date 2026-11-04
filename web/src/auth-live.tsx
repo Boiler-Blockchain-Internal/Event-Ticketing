@@ -16,6 +16,31 @@ const config = {
 
 export const LiveProvider = ({ children }: { children: ReactNode }) => <Web3AuthProvider config={config}>{children}</Web3AuthProvider>
 
+function clearWeb3AuthStorage() {
+  try {
+    for (const storage of [localStorage, sessionStorage]) {
+      const keysToRemove: string[] = []
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i)
+        if (key && (/^(Web3Auth|auth_store|w3a|openlogin|torus)/i.test(key) || key.includes('web3auth'))) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(k => storage.removeItem(k))
+    }
+  } catch { /* storage access restricted */ }
+
+  try {
+    document.cookie.split(';').forEach(c => {
+      const name = c.split('=')[0].trim()
+      if (/^(Web3Auth|auth_store|w3a|openlogin|torus)/i.test(name) || name.includes('web3auth')) {
+        document.cookie = `${name}=; Max-Age=0; path=/;`
+        document.cookie = `${name}=; Max-Age=0;`
+      }
+    })
+  } catch { /* cookie access restricted */ }
+}
+
 export function useLiveAccount(): Account {
   const { connection, isConnected, isInitialized, web3Auth } = useWeb3Auth()
   const { connectTo } = useWeb3AuthConnect()
@@ -41,7 +66,13 @@ export function useLiveAccount(): Account {
         : { authConnection: AUTH_CONNECTION.GOOGLE })
     },
     signOut: async () => {
-      await disconnect({ cleanup: true })
+      try {
+        await disconnect({ cleanup: true })
+      } catch { /* ignore disconnect error */ }
+      try {
+        await web3Auth?.clearCache()
+      } catch { /* ignore clearCache error */ }
+      clearWeb3AuthStorage()
     },
   }
 }
