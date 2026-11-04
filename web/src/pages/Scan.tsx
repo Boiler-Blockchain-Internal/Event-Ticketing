@@ -93,6 +93,9 @@ export function Scan() {
   return (
     <main className="app scan">
       <header className="scan-head">
+        <a href="#/" className="icon-btn" aria-label="Exit check-in">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>
+        </a>
         <div>
           <p className="eyebrow muted-eyebrow">Staff check-in</p>
           <h1>{head.name}</h1>
