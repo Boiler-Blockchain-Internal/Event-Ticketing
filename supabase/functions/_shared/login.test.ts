@@ -45,6 +45,16 @@ test('validates Web3Auth v11 Citadel issuer tokens', async () => {
   })
 })
 
+test('validates Web3Auth v11 bare web3auth.io issuer tokens with ethereum address claim', async () => {
+  const citadelToken = await token({
+    iss: 'web3auth.io', aud: 'client-1', exp: now / 1000 + 600, email: 'citadel-attendee@purdue.edu', name: 'Citadel Attendee',
+    wallets: [{ address: wallet.address, type: 'ethereum' }],
+  })
+  assert.deepEqual(await verifyLogin(citadelToken, 'client-1', now, jwks), {
+    email: 'citadel-attendee@purdue.edu', name: 'Citadel Attendee', address: wallet.address.toLowerCase(),
+  })
+})
+
 test('rejects other projects, other issuers, expired, unknown keys and tampering', async () => {
   const v = async (t: string) => verifyLogin(t, 'client-1', now, jwks)
   assert.equal(await v(await token({ ...good, aud: 'client-2' })), null)

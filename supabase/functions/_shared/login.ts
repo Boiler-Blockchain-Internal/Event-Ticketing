@@ -12,6 +12,8 @@ export const ALLOWED_ISSUERS = [
   'https://api.web3auth.io',
   'https://auth.web3auth.io',
   'https://api-develop.web3auth.io/citadel-service',
+  'web3auth.io',
+  'https://web3auth.io',
 ]
 const JWKS_URLS = [
   'https://api.web3auth.io/citadel-service/.well-known/jwks.json',
@@ -79,8 +81,9 @@ export async function verifyLogin(
     const c = json(p)
     const audList = (Array.isArray(c.aud) ? c.aud : [c.aud]).map((a: unknown) => String(a).trim())
     const targetClient = clientId.trim()
-    const receivedIss = typeof c.iss === 'string' ? c.iss.replace(/\/$/, '') : ''
-    const issMatch = ALLOWED_ISSUERS.some(allowed => allowed.replace(/\/$/, '') === receivedIss)
+    const normalizeIss = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+    const receivedIss = typeof c.iss === 'string' ? normalizeIss(c.iss) : ''
+    const issMatch = ALLOWED_ISSUERS.some(allowed => normalizeIss(allowed) === receivedIss)
 
     if (!issMatch) {
       console.error('verifyLogin: issuer mismatch', { expected: ISSUER, received: c.iss })
@@ -95,23 +98,35 @@ export async function verifyLogin(
       return null
     }
 
-    const rawEmail = typeof c.email === 'string' ? c.email : typeof c.verifierId === 'string' ? c.verifierId : typeof c.userId === 'string' ? c.userId : null
-    const email = rawEmail || (typeof c.sub === 'string' && c.sub.includes('@') ? c.sub : typeof clientBody?.email === 'string' ? clientBody.email : typeof c.sub === 'string' ? `${c.sub}@web3auth.user` : null)
+    const nonEmpty = (s: unknown): string | null => (typeof s === 'string' && s.trim().length > 0 ? s.trim() : null)
+
+    const rawEmail = nonEmpty(c.email) || nonEmpty(c.verifierId) || nonEmpty(c.userId) || nonEmpty(clientBody?.email)
+    const email = rawEmail || (typeof c.sub === 'string' && c.sub.includes('@') ? c.sub.trim() : typeof c.sub === 'string' && c.sub.trim().length > 0 ? `${c.sub.trim()}@web3auth.user` : null)
     if (!email) {
       console.error('verifyLogin: missing email/user claim in payload', Object.keys(c))
       return null
     }
 
-    // First try resolving address from secp256k1 key in token wallets
+    // First try resolving address directly from Ethereum wallet claim in token
     let address: Address | null = null
-    const w = (c.wallets ?? []).find((w: { type?: string; curve?: string; public_key?: string }) =>
-      (w.curve?.toLowerCase() === 'secp256k1' || w.type === 'web3auth_app_key') && typeof w.public_key === 'string'
+    const ethWallet = (c.wallets ?? []).find((w: { address?: string; type?: string }) =>
+      typeof w.address === 'string' && /^0x[0-9a-fA-F]{40}$/.test(w.address)
     )
-    if (w?.public_key) {
-      try {
-        address = publicKeyToAddress(uncompressed(w.public_key)).toLowerCase() as Address
-      } catch (err) {
-        console.warn('verifyLogin: could not derive address from public_key, checking client payload', err)
+    if (ethWallet?.address) {
+      address = ethWallet.address.toLowerCase() as Address
+    }
+
+    // Next try deriving from secp256k1 public key in token wallets
+    if (!address) {
+      const w = (c.wallets ?? []).find((w: { type?: string; curve?: string; public_key?: string }) =>
+        (w.curve?.toLowerCase() === 'secp256k1' || w.type === 'web3auth_app_key') && typeof w.public_key === 'string'
+      )
+      if (w?.public_key) {
+        try {
+          address = publicKeyToAddress(uncompressed(w.public_key)).toLowerCase() as Address
+        } catch (err) {
+          console.warn('verifyLogin: could not derive address from public_key, checking client payload', err)
+        }
       }
     }
 
@@ -125,7 +140,8 @@ export async function verifyLogin(
       return null
     }
 
-    return { email: email.toLowerCase(), name: c.name || clientBody?.name || null, address }
+    const name = nonEmpty(c.name) || nonEmpty(clientBody?.name) || null
+    return { email: email.toLowerCase(), name, address }
   } catch (err) {
     console.error('verifyLogin: exception caught during token parsing', err)
     return null
