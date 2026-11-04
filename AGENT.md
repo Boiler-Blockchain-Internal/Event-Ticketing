@@ -10,8 +10,8 @@ Passmark is a Web3 Event Ticketing & Membership Platform piloted with Boiler Blo
 ## Repository Layout
 
 - `contracts/`: Solidity 0.8.28 ERC-721 + ERC-5192 soulbound credentials (`contracts/contracts/Passmark.sol`), Hardhat 3 + viem, Hardhat Ignition deployment (`ignition/modules/Passmark.ts`), deployed to Base Sepolia at `0x256c1A87b79f28de3989cBf1742144E3Ca21705C` (chain ID 84532), and 11 unit tests (`test/Passmark.ts`).
-- `supabase/`: Postgres schema & RLS migrations (`supabase/migrations/20261015000000_init.sql`), Deno scan Edge Function (`supabase/functions/scan/`), and runtime-agnostic shared crypto/verification (`supabase/functions/_shared/`).
-- `web/`: Vite + React 19 + TypeScript SPA (mobile-first ticketing PWA). Hash-based routing via `useSyncExternalStore`, design tokens (`--bg`, `--accent`, etc.), zero-dependency QR generation (`qrcode-generator`).
+- `supabase/`: Postgres schema & RLS migrations (`supabase/migrations/`), Deno `scan` and `me` Edge Functions (`supabase/functions/`), and runtime-agnostic shared crypto/verification (`supabase/functions/_shared/`).
+- `web/`: Vite + React 19 + TypeScript SPA (mobile-first ticketing PWA). Hash-based routing via `useSyncExternalStore`, MetaMask Embedded Wallets (`@web3auth/modal`) sign-in (`src/auth.tsx`, `src/auth-live.tsx`), design tokens (`--bg`, `--accent`, etc.), zero-dependency QR generation (`qrcode-generator`).
 - `scripts/`: Operational CLI tools (e.g. `staff-link.ts` generating HMAC-signed door links).
 - `docs/notion/`: Canonical planning documentation and specifications.
 
@@ -31,7 +31,7 @@ npm install            # Install workspace dependencies
 npm run dev            # Start web dev server (http://localhost:5173)
 npm run compile        # Compile contracts with Hardhat (solc 0.8.28)
 npm test -w contracts  # Run 11 Hardhat contract tests (viem + node:test)
-npm test -w web        # Run 11 web & shared crypto/Supabase unit tests (node:test)
+npm test -w web        # Run 14 web & shared crypto/Supabase unit tests (node:test)
 npm run build -w web   # Typecheck and production build web app
 ```
 
