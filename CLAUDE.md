@@ -1,5 +1,7 @@
 # Passmark (Event-Ticketing)
 
+> **Note**: See [AGENT.md](./AGENT.md) for canonical agent instructions, architecture invariants, and standards across all AI coding assistants.
+
 Verifiable event tickets, member cards and attendance records for student orgs, piloted with Boiler Blockchain.
 Attendees sign in with email, show a rotating QR, and get in. They never see a wallet, gas, or chain terms.
 
@@ -18,7 +20,7 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 - `supabase/functions/scan/`: the scan edge function (`verify_jwt = false` in `config.toml`; the staff token is the auth).
 - `scripts/staff-link.ts`: prints a door-staff link until the admin dashboard exists.
 - `supabase/migrations/`: Postgres schema, RLS, and the atomic `check_in` function.
-- `contracts/`: Hardhat 3 + viem (not Foundry). No contract yet.
+- `contracts/`: Hardhat 3 + viem (not Foundry), OpenZeppelin v5 ERC-721 + ERC-5192 (`contracts/contracts/Passmark.sol`), Hardhat Ignition module (`ignition/modules/Passmark.ts`), 9 unit tests (`test/Passmark.ts`).
 - `index.html` (root): static marketing page with the design tokens (`--bg`, `--accent`, `--amber`, `--red`, Geist fonts). Reuse these tokens in `web/`.
 
 ## Commands
@@ -26,8 +28,10 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 ```bash
 npm install            # from repo root
 npm run dev            # web dev server
-npm run build          # tsc -b && vite build
-npm test -w web          # unit tests, web + server (node:test runs .ts directly, Node 23.6+)
+npm run compile        # hardhat compile contracts
+npm test -w contracts  # hardhat unit tests (9 tests)
+npm test -w web        # unit tests, web + server (node:test runs .ts directly, Node 23.6+)
+npm run build -w web   # typecheck and build web app
 ```
 
 ## Conventions
@@ -53,7 +57,7 @@ npm test -w web          # unit tests, web + server (node:test runs .ts directly
 
 ## Build order (MVP must-haves, above the cut line)
 
-1. Contract on Base Sepolia: mint, transfer lock, revoke/reissue, events. Foundry tests incl. fuzz.
+1. Contract on Base Sepolia: mint, transfer lock, revoke/reissue, events. (Implemented: `contracts/contracts/Passmark.sol`, 9 unit tests passing).
 2. Supabase schema: users, events, credentials, checkins (unique constraint), nonces.
 3. Email/Google sign-in with embedded wallet; platform-sponsored mint.
 4. Admin: create event / membership tier; issue by CSV and capped claim link.
