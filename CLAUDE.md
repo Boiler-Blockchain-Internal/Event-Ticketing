@@ -15,7 +15,7 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
   - `src/router.ts`: hash routing via `useSyncExternalStore`. No react-router.
   - `src/data.ts`: mock data, stands in until the backend and contract exist.
   - `src/verify.ts`: door-side scan check. Local stand-in for the real backend check.
-  - `src/auth.tsx`: `useAccount()`: MetaMask Embedded Wallets login + signer when `VITE_WEB3AUTH_CLIENT_ID` and `VITE_SUPABASE_URL` are set, else a demo key.
+  - `src/auth.tsx`: `useAccount()`: MetaMask Embedded Wallets login + signer when `VITE_WEB3AUTH_CLIENT_ID` and `VITE_SUPABASE_URL` are set, else a demo key. The SDK lives in `src/auth-live.tsx` and is imported only in live mode (it prefetches MetaMask's frame on import).
   - `src/pages/`, `src/components/`: screens and UI pieces (`Qr.tsx`, `HeroTicket.tsx`, `Logo.tsx`).
 - `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `login.ts` MetaMask ID-token check (ES256 via WebCrypto) and wallet address; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
 - `supabase/functions/scan/`: the scan edge function (`verify_jwt = false` in `config.toml`; the staff token is the auth).
