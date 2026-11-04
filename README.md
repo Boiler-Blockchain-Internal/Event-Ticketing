@@ -32,7 +32,8 @@ npm test -w contracts  # hardhat unit tests (11 tests)
    - `VITE_WEB3AUTH_NETWORK`: `devnet` (supports `http://localhost:5173`) or `mainnet`.
 3. In the Supabase project dashboard (**Project Settings > Edge Functions > Secrets**), add the runtime secrets:
    - `STAFF_LINK_SECRET`: Same shared secret passphrase as above.
-   - `WEB3AUTH_CLIENT_ID`: Same client ID as `VITE_WEB3AUTH_CLIENT_ID` (required for `/functions/v1/me` ID token verification).
+   - `WEB3AUTH_CLIENT_ID`: Same client ID as `VITE_WEB3AUTH_CLIENT_ID` (required for `/functions/v1/me` and `/functions/v1/claim` ID token verification).
+   - `DEPLOYER_PRIVATE_KEY`: Platform relayer private key for sponsored minting on Base Sepolia (`/functions/v1/claim`).
 4. Generate an expiring door-staff scan link:
    ```bash
    STAFF_LINK_SECRET=your_secret node scripts/staff-link.ts bb-fgm 12 http://localhost:5173

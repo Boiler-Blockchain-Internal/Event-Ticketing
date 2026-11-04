@@ -6,6 +6,23 @@ export type PassInfo = {
   credentialId: string; eventId: string; kind: 'event' | 'membership'; status: 'active' | 'revoked'
   name: string; org: string; startsAt: string | null; venue: string | null; checkedInAt: string | null
 }
+export type ClaimTarget = {
+  event: { id: string; name: string; capacity: number | null } | null
+  activeCount: number
+  existingCredentialId: string | null
+}
+export type CreateEventInput = {
+  id: string
+  name: string
+  orgId?: string
+  orgName?: string
+  kind?: 'event' | 'membership'
+  startsAt?: string | null
+  doorsOpenAt?: string | null
+  doorsCloseAt?: string | null
+  venue?: string | null
+  capacity?: number | null
+}
 
 // Scan deps backed by Supabase PostgREST over plain fetch (works in Deno edge functions and Node).
 // Needs the service-role / secret key: server-side only, never ship it to the browser.
@@ -15,7 +32,8 @@ export function supabaseDeps(url: string, serviceKey: string) {
   const get = async (path: string, init?: RequestInit) => {
     const res = await fetch(`${url}/rest/v1/${path}`, { headers, ...init })
     if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`)
-    return res.json()
+    const text = await res.text()
+    return text ? JSON.parse(text) : null
   }
 
   const deps: Deps = {
@@ -63,6 +81,63 @@ export function supabaseDeps(url: string, serviceKey: string) {
         name: r.events.name, org: r.events.orgs.name, startsAt: r.events.starts_at, venue: r.events.venue,
         checkedInAt: r.checkins[0]?.checked_in_at ?? null,
       }))
+    },
+    async claimInfo(eventId: string, userId: string): Promise<ClaimTarget> {
+      const [e] = await get(
+        `events?id=eq.${encodeURIComponent(eventId)}&select=id,name,capacity,credentials(id::text,holder_id,status)`
+      )
+      if (!e) return { event: null, activeCount: 0, existingCredentialId: null }
+      const creds = Array.isArray(e.credentials) ? e.credentials : []
+      const activeCreds = creds.filter((c: any) => c.status === 'active')
+      const existing = activeCreds.find((c: any) => c.holder_id === userId)
+      return {
+        event: { id: e.id, name: e.name, capacity: e.capacity },
+        activeCount: activeCreds.length,
+        existingCredentialId: existing?.id ?? null,
+      }
+    },
+    async saveCredential(cred: { id: string; eventId: string; holderId: string; metadataHash: string }): Promise<void> {
+      await get('credentials', {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          id: cred.id,
+          event_id: cred.eventId,
+          holder_id: cred.holderId,
+          status: 'active',
+          metadata_hash: cred.metadataHash,
+        }),
+      })
+    },
+    async getOrCreateOrg(name = 'Boiler Blockchain'): Promise<string> {
+      const rows = await get(`orgs?name=eq.${encodeURIComponent(name)}&select=id`)
+      if (rows[0]?.id) return rows[0].id
+      const [created] = await get('orgs?select=id', {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'return=representation' },
+        body: JSON.stringify({ name }),
+      })
+      return created.id
+    },
+    async createEvent(input: CreateEventInput): Promise<{ id: string; name: string }> {
+      const orgId = input.orgId ?? (await this.getOrCreateOrg(input.orgName || 'Boiler Blockchain'))
+      const payload = {
+        id: input.id,
+        org_id: orgId,
+        kind: input.kind ?? 'event',
+        name: input.name.trim(),
+        starts_at: input.startsAt ?? null,
+        doors_open_at: input.doorsOpenAt ?? null,
+        doors_close_at: input.doorsCloseAt ?? null,
+        venue: input.venue ?? null,
+        capacity: input.capacity ?? null,
+      }
+      const [row] = await get('events?select=id,name', {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'return=representation' },
+        body: JSON.stringify(payload),
+      })
+      return { id: row.id, name: row.name }
     },
   }
 }

@@ -7,3 +7,7 @@ verify_jwt = false
 # Attendees sign in with MetaMask Embedded Wallets, not Supabase Auth; the function verifies that token.
 [functions.me]
 verify_jwt = false
+
+# Attendee pass claim & sponsored minting relayer
+[functions.claim]
+verify_jwt = false

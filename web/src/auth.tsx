@@ -7,6 +7,9 @@ import type { Signer } from '../../supabase/functions/_shared/pass.ts'
 export const ME_URL = import.meta.env.VITE_WEB3AUTH_CLIENT_ID && import.meta.env.VITE_SUPABASE_URL
   ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/me` : null
 
+export const CLAIM_URL = import.meta.env.VITE_WEB3AUTH_CLIENT_ID && import.meta.env.VITE_SUPABASE_URL
+  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/claim` : null
+
 export type Account = {
   ready: boolean
   signedIn: boolean
