@@ -171,3 +171,148 @@ test('handles PostgREST error responses by throwing descriptive error', async ()
     globalThis.fetch = originalFetch
   }
 })
+
+test('getOrCreateOrg finds existing or creates new org', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = String(url)
+      if (init?.method === 'POST') {
+        return new Response(JSON.stringify([{ id: 'new-org-uuid' }]), { status: 200 })
+      }
+      if (urlStr.includes('name=eq.Existing%20Org')) {
+        return new Response(JSON.stringify([{ id: 'existing-org-uuid' }]), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+
+    const existing = await deps.getOrCreateOrg('Existing Org')
+    assert.equal(existing, 'existing-org-uuid')
+
+    const created = await deps.getOrCreateOrg('New Org')
+    assert.equal(created, 'new-org-uuid')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('createEvent validates input and inserts event record', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    let capturedBody = ''
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = String(url)
+      if (urlStr.includes('orgs?name=eq.')) {
+        return new Response(JSON.stringify([{ id: 'org-uuid-1' }]), { status: 200 })
+      }
+      if (init?.method === 'POST') {
+        capturedBody = String(init?.body)
+        const parsed = JSON.parse(capturedBody)
+        return new Response(
+          JSON.stringify([
+            {
+              id: parsed.id,
+              org_id: parsed.org_id,
+              kind: parsed.kind,
+              name: parsed.name,
+              starts_at: parsed.starts_at,
+              doors_open_at: parsed.doors_open_at,
+              doors_close_at: parsed.doors_close_at,
+              venue: parsed.venue,
+              capacity: parsed.capacity,
+            },
+          ]),
+          { status: 200 },
+        )
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+
+    // Valid event
+    const event = await deps.createEvent({
+      id: 'bb-kickoff',
+      name: 'Spring Kickoff',
+      kind: 'event',
+      venue: 'Lawson B155',
+      capacity: 100,
+      startsAt: '2026-11-12T19:00:00Z',
+    })
+
+    assert.equal(event.id, 'bb-kickoff')
+    assert.equal(event.name, 'Spring Kickoff')
+    assert.equal(event.orgId, 'org-uuid-1')
+    assert.equal(event.capacity, 100)
+    assert.deepEqual(JSON.parse(capturedBody), {
+      id: 'bb-kickoff',
+      org_id: 'org-uuid-1',
+      kind: 'event',
+      name: 'Spring Kickoff',
+      starts_at: '2026-11-12T19:00:00Z',
+      doors_open_at: null,
+      doors_close_at: null,
+      venue: 'Lawson B155',
+      capacity: 100,
+    })
+
+    // Validation failures
+    await assert.rejects(
+      async () => deps.createEvent({ id: 'invalid slug with spaces!', name: 'Test' }),
+      /Event ID must only contain letters/,
+    )
+    await assert.rejects(
+      async () => deps.createEvent({ id: 'valid-slug', name: '  ' }),
+      /Event name is required/,
+    )
+    await assert.rejects(
+      async () => deps.createEvent({ id: 'valid-slug', name: 'Test', capacity: -5 }),
+      /Capacity must be a positive number/,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('getEvent fetches and maps event by id', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = String(url)
+      if (urlStr.includes('id=eq.bb-fgm')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'bb-fgm',
+              org_id: 'org-uuid-1',
+              kind: 'event',
+              name: 'Fall General Meeting',
+              starts_at: '2026-11-12T19:00:00Z',
+              doors_open_at: null,
+              doors_close_at: null,
+              venue: 'Lawson B155',
+              capacity: 120,
+            },
+          ]),
+          { status: 200 },
+        )
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+
+    const event = await deps.getEvent('bb-fgm')
+    assert.ok(event)
+    assert.equal(event.id, 'bb-fgm')
+    assert.equal(event.name, 'Fall General Meeting')
+    assert.equal(event.capacity, 120)
+
+    const missing = await deps.getEvent('does-not-exist')
+    assert.equal(missing, null)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
