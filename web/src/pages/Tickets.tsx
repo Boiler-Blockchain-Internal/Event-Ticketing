@@ -63,6 +63,7 @@ function useView(): { view: View | null; error: string | null } {
   useEffect(() => {
     if (!ME_URL || !account.signedIn) return
     account.idToken().then(async token => {
+      if (!token) return
       const [address, info] = await Promise.all([
         account.address(),
         account.userInfo(),

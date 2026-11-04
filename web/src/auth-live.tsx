@@ -22,7 +22,7 @@ function clearWeb3AuthStorage() {
       const keysToRemove: string[] = []
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i)
-        if (key && (/^(Web3Auth|auth_store|w3a|openlogin|torus)/i.test(key) || key.includes('web3auth'))) {
+        if (key && (key === 'Web3Auth-state' || key.startsWith('auth_store'))) {
           keysToRemove.push(key)
         }
       }
@@ -33,7 +33,7 @@ function clearWeb3AuthStorage() {
   try {
     document.cookie.split(';').forEach(c => {
       const name = c.split('=')[0].trim()
-      if (/^(Web3Auth|auth_store|w3a|openlogin|torus)/i.test(name) || name.includes('web3auth')) {
+      if (name === 'Web3Auth-state' || name.startsWith('auth_store')) {
         document.cookie = `${name}=; Max-Age=0; path=/;`
         document.cookie = `${name}=; Max-Age=0;`
       }
@@ -46,28 +46,43 @@ export function useLiveAccount(): Account {
   const { connectTo } = useWeb3AuthConnect()
   const { disconnect } = useWeb3AuthDisconnect()
   const { getAuthTokenInfo } = useAuthTokenInfo()
-  const provider = connection?.ethereumProvider
+  const provider = connection?.ethereumProvider ?? web3Auth?.connection?.ethereumProvider
   const client = useMemo(() => provider ? createWalletClient({ transport: custom(provider) }) : null, [provider])
   const signer = useMemo<Signer | undefined>(() => {
     if (!client) return
     return { signMessage: async ({ message }) => client.signMessage({ account: (await client.getAddresses())[0], message }) }
   }, [client])
+  const signedIn = isConnected || Boolean(web3Auth?.connected)
   return {
     ready: isInitialized,
-    signedIn: isConnected,
+    signedIn,
     signer,
     address: async () => client ? (await client.getAddresses())[0] : null,
     userInfo: async () => web3Auth ? web3Auth.getUserInfo() : null,
-    idToken: getAuthTokenInfo,
+    idToken: async () => (await getAuthTokenInfo()) ?? web3Auth?.idToken ?? null,
     signIn: async email => {
+      // Ensure the AUTH connector is ready before calling connectTo
+      if (web3Auth) {
+        const start = Date.now()
+        while (Date.now() - start < 4000) {
+          const authConn = web3Auth.getConnector(WALLET_CONNECTORS.AUTH)
+          if (authConn && (authConn.status === 'ready' || authConn.status === 'connected')) {
+            break
+          }
+          await new Promise(r => setTimeout(r, 100))
+        }
+      }
       // connectTo skips MetaMask's own picker, which would show attendees wallet options.
-      await connectTo(WALLET_CONNECTORS.AUTH, email
+      const conn = await connectTo(WALLET_CONNECTORS.AUTH, email
         ? { authConnection: AUTH_CONNECTION.EMAIL_PASSWORDLESS, loginHint: email }
         : { authConnection: AUTH_CONNECTION.GOOGLE })
+      if (!conn && !web3Auth?.connected) {
+        throw new Error("Sign-in didn't finish")
+      }
     },
     signOut: async () => {
       try {
-        await disconnect({ cleanup: true })
+        await disconnect()
       } catch { /* ignore disconnect error */ }
       try {
         await web3Auth?.clearCache()
