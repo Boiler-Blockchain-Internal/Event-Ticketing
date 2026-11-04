@@ -16,7 +16,7 @@ npm run dev            # web on http://localhost:5173
 npm run build          # typecheck + production build
 npm test -w web        # scan & backend verification unit tests
 npm run compile        # hardhat build
-npm test -w contracts  # hardhat unit tests (9 tests)
+npm test -w contracts  # hardhat unit tests (11 tests)
 ```
 
 ## Backend & Supabase Setup
