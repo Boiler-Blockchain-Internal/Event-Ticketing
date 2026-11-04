@@ -3,5 +3,8 @@ dist
 contracts/artifacts
 contracts/cache
 contracts/types
+contracts/ignition/deployments/**/journal.jsonl
+contracts/ignition/deployments/**/build-info
+contracts/ignition/deployments/**/artifacts
 .env
 .env.local
