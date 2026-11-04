@@ -19,7 +19,11 @@ export function Redeem() {
     setClaiming(true)
     setError(null)
     try {
-      const token = await account.idToken()
+      const [token, address, info] = await Promise.all([
+        account.idToken(),
+        (account as any).address ? (account as any).address() : null,
+        (account as any).userInfo ? (account as any).userInfo() : null,
+      ])
       if (!token) throw new Error('Sign-in required to claim pass.')
       const res = await fetch(CLAIM_URL, {
         method: 'POST',
@@ -27,7 +31,7 @@ export function Redeem() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ eventId }),
+        body: JSON.stringify({ eventId, address, email: info?.email, name: info?.name }),
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error ?? 'Failed to claim pass. Try again.')
