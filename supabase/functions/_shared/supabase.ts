@@ -1,6 +1,11 @@
 import type { Deps } from './scan.ts'
+import type { Login } from './login.ts'
 
 export type EventSummary = { name: string; capacity: number | null; checkedIn: number }
+export type PassInfo = {
+  credentialId: string; eventId: string; kind: 'event' | 'membership'; status: 'active' | 'revoked'
+  name: string; org: string; startsAt: string | null; venue: string | null; checkedInAt: string | null
+}
 
 // Scan deps backed by Supabase PostgREST over plain fetch (works in Deno edge functions and Node).
 // Needs the service-role / secret key: server-side only, never ship it to the browser.
@@ -40,6 +45,24 @@ export function supabaseDeps(url: string, serviceKey: string) {
     async eventSummary(eventId: string): Promise<EventSummary | null> {
       const [e] = await get(`events?id=eq.${encodeURIComponent(eventId)}&select=name,capacity,checkins(count)`)
       return e ? { name: e.name, capacity: e.capacity, checkedIn: e.checkins[0]?.count ?? 0 } : null
+    },
+    // Creates or refreshes the user keyed by wallet. Throws `Supabase 409` if the email already has another wallet.
+    async saveUser(login: Login): Promise<string> {
+      const [u] = await get('users?on_conflict=wallet_address&select=id', {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({ email: login.email, name: login.name, wallet_address: login.address }),
+      })
+      return u.id
+    },
+    async passesFor(userId: string): Promise<PassInfo[]> {
+      const rows = await get(`credentials?holder_id=eq.${userId}&reissued_as=is.null&order=id.desc` +
+        '&select=id::text,status,events(id,kind,name,starts_at,venue,orgs(name)),checkins(checked_in_at)')
+      return rows.map((r: any) => ({
+        credentialId: r.id, eventId: r.events.id, kind: r.events.kind, status: r.status,
+        name: r.events.name, org: r.events.orgs.name, startsAt: r.events.starts_at, venue: r.events.venue,
+        checkedInAt: r.checkins[0]?.checked_in_at ?? null,
+      }))
     },
   }
 }
