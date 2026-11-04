@@ -22,7 +22,7 @@ function clearWeb3AuthStorage() {
       const keysToRemove: string[] = []
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i)
-        if (key && (key === 'Web3Auth-state' || key.startsWith('auth_store'))) {
+        if (key && (key === 'Web3Auth-state' || key.startsWith('auth_store') || key.startsWith('w3a:'))) {
           keysToRemove.push(key)
         }
       }
@@ -33,7 +33,7 @@ function clearWeb3AuthStorage() {
   try {
     document.cookie.split(';').forEach(c => {
       const name = c.split('=')[0].trim()
-      if (name === 'Web3Auth-state' || name.startsWith('auth_store')) {
+      if (name === 'Web3Auth-state' || name.startsWith('auth_store') || name.startsWith('w3a:')) {
         document.cookie = `${name}=; Max-Age=0; path=/;`
         document.cookie = `${name}=; Max-Age=0;`
       }
@@ -57,9 +57,27 @@ export function useLiveAccount(): Account {
     ready: isInitialized,
     signedIn,
     signer,
-    address: async () => client ? (await client.getAddresses())[0] : null,
-    userInfo: async () => web3Auth ? web3Auth.getUserInfo() : null,
-    idToken: async () => (await getAuthTokenInfo()) ?? web3Auth?.idToken ?? null,
+    address: async () => {
+      try {
+        return client ? (await client.getAddresses())[0] : null
+      } catch {
+        return null
+      }
+    },
+    userInfo: async () => {
+      try {
+        return web3Auth ? await web3Auth.getUserInfo() : null
+      } catch {
+        return null
+      }
+    },
+    idToken: async () => {
+      try {
+        return (await getAuthTokenInfo()) ?? web3Auth?.idToken ?? null
+      } catch {
+        return web3Auth?.idToken ?? null
+      }
+    },
     signIn: async email => {
       // Ensure the AUTH connector is ready before calling connectTo
       if (web3Auth) {

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { ISSUER, uncompressed, verifyLogin } from './login.ts'
+import { CITADEL_ISSUER, ISSUER, uncompressed, verifyLogin } from './login.ts'
 
 const now = 1_800_000_000_000
 const wallet = privateKeyToAccount(generatePrivateKey())
@@ -32,6 +32,16 @@ test('decompresses secp256k1 keys of both parities', () => {
 test('valid token yields email, name and the wallet address', async () => {
   assert.deepEqual(await verifyLogin(await token(good), 'client-1', now, jwks), {
     email: 'priya@purdue.edu', name: 'Priya S.', address: wallet.address.toLowerCase(),
+  })
+})
+
+test('validates Web3Auth v11 Citadel issuer tokens', async () => {
+  const citadelToken = await token({
+    iss: CITADEL_ISSUER, aud: 'client-1', exp: now / 1000 + 600, email: 'citadel@purdue.edu', name: 'Citadel User',
+    wallets: [{ type: 'web3auth_app_key', curve: 'secp256k1', public_key: compressed(wallet.publicKey) }],
+  })
+  assert.deepEqual(await verifyLogin(citadelToken, 'client-1', now, jwks), {
+    email: 'citadel@purdue.edu', name: 'Citadel User', address: wallet.address.toLowerCase(),
   })
 })
 

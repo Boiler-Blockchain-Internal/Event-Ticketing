@@ -5,15 +5,42 @@ import { unb64url } from './staff.ts'
 // Verifies a MetaMask Embedded Wallets (Web3Auth) ID token: ES256 JWT, issuer below, audience = our client ID.
 // WebCrypto only, so it runs in Deno and Node.
 export const ISSUER = 'https://api-auth.web3auth.io'
-const JWKS_URL = `${ISSUER}/jwks`
+export const CITADEL_ISSUER = 'https://api.web3auth.io/citadel-service'
+export const ALLOWED_ISSUERS = [
+  ISSUER,
+  CITADEL_ISSUER,
+  'https://api.web3auth.io',
+  'https://auth.web3auth.io',
+  'https://api-develop.web3auth.io/citadel-service',
+]
+const JWKS_URLS = [
+  'https://api.web3auth.io/citadel-service/.well-known/jwks.json',
+  `${ISSUER}/jwks`,
+]
 
 export type Login = { email: string; name: string | null; address: Address }
 export type LoginPayload = { address?: string; email?: string; name?: string }
 type Jwks = { keys: (JsonWebKey & { kid?: string })[] }
 
-// ponytail: fetched per cold start, no refresh on key rotation; refetch on unknown kid if MetaMask rotates often.
+// ponytail: fetched per cold start; refetches on unknown kid in case of key rotation.
 let cached: Promise<Jwks> | undefined
-const fetchJwks = (): Promise<Jwks> => (cached ??= fetch(JWKS_URL).then(r => r.json()))
+export const fetchJwks = async (force = false): Promise<Jwks> => {
+  if (force) cached = undefined
+  return (cached ??= (async () => {
+    const results = await Promise.allSettled(JWKS_URLS.map(u => fetch(u).then(r => r.json() as Promise<Jwks>)))
+    const keys: (JsonWebKey & { kid?: string })[] = []
+    for (const res of results) {
+      if (res.status === 'fulfilled' && Array.isArray(res.value?.keys)) {
+        for (const k of res.value.keys) {
+          if (!keys.some(existing => existing.kid && existing.kid === k.kid)) {
+            keys.push(k)
+          }
+        }
+      }
+    }
+    return { keys }
+  })())
+}
 
 const json = (s: string) => JSON.parse(new TextDecoder().decode(unb64url(s)))
 
@@ -32,8 +59,12 @@ export async function verifyLogin(
   }
   try {
     const header = json(h)
-    const allJwks = await jwks()
-    const jwk = allJwks.keys.find(k => k.kid === header.kid)
+    let allJwks = await jwks()
+    let jwk = allJwks.keys.find(k => k.kid === header.kid)
+    if (!jwk && jwks === fetchJwks) {
+      allJwks = await fetchJwks(true)
+      jwk = allJwks.keys.find(k => k.kid === header.kid)
+    }
     if (header.alg !== 'ES256' || !jwk) {
       console.error('verifyLogin: header alg mismatch or kid not found', { alg: header.alg, kid: header.kid })
       return null
@@ -48,7 +79,8 @@ export async function verifyLogin(
     const c = json(p)
     const audList = (Array.isArray(c.aud) ? c.aud : [c.aud]).map((a: unknown) => String(a).trim())
     const targetClient = clientId.trim()
-    const issMatch = typeof c.iss === 'string' && c.iss.replace(/\/$/, '') === ISSUER.replace(/\/$/, '')
+    const receivedIss = typeof c.iss === 'string' ? c.iss.replace(/\/$/, '') : ''
+    const issMatch = ALLOWED_ISSUERS.some(allowed => allowed.replace(/\/$/, '') === receivedIss)
 
     if (!issMatch) {
       console.error('verifyLogin: issuer mismatch', { expected: ISSUER, received: c.iss })
