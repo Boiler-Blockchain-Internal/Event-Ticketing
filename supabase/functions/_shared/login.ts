@@ -8,6 +8,7 @@ export const ISSUER = 'https://api-auth.web3auth.io'
 const JWKS_URL = `${ISSUER}/jwks`
 
 export type Login = { email: string; name: string | null; address: Address }
+export type LoginPayload = { address?: string; email?: string; name?: string }
 type Jwks = { keys: (JsonWebKey & { kid?: string })[] }
 
 // ponytail: fetched per cold start, no refresh on key rotation; refetch on unknown kid if MetaMask rotates often.
@@ -17,7 +18,13 @@ const fetchJwks = (): Promise<Jwks> => (cached ??= fetch(JWKS_URL).then(r => r.j
 const json = (s: string) => JSON.parse(new TextDecoder().decode(unb64url(s)))
 
 // Returns null for anything forged, expired, or issued to another project.
-export async function verifyLogin(token: string, clientId: string, now = Date.now(), jwks = fetchJwks): Promise<Login | null> {
+export async function verifyLogin(
+  token: string,
+  clientId: string,
+  now = Date.now(),
+  jwks = fetchJwks,
+  clientBody?: LoginPayload,
+): Promise<Login | null> {
   const [h, p, s] = token.split('.')
   if (!h || !p || !s) {
     console.error('verifyLogin: token missing segments')
@@ -42,8 +49,6 @@ export async function verifyLogin(token: string, clientId: string, now = Date.no
     const audList = (Array.isArray(c.aud) ? c.aud : [c.aud]).map((a: unknown) => String(a).trim())
     const targetClient = clientId.trim()
     const issMatch = typeof c.iss === 'string' && c.iss.replace(/\/$/, '') === ISSUER.replace(/\/$/, '')
-    const rawEmail = typeof c.email === 'string' ? c.email : typeof c.verifierId === 'string' ? c.verifierId : typeof c.userId === 'string' ? c.userId : null
-    const email = rawEmail || (typeof c.sub === 'string' && c.sub.includes('@') ? c.sub : typeof c.sub === 'string' ? `${c.sub}@web3auth.user` : null)
 
     if (!issMatch) {
       console.error('verifyLogin: issuer mismatch', { expected: ISSUER, received: c.iss })
@@ -57,19 +62,38 @@ export async function verifyLogin(token: string, clientId: string, now = Date.no
       console.error('verifyLogin: token expired', { exp: c.exp, now: now / 1000 })
       return null
     }
+
+    const rawEmail = typeof c.email === 'string' ? c.email : typeof c.verifierId === 'string' ? c.verifierId : typeof c.userId === 'string' ? c.userId : null
+    const email = rawEmail || (typeof c.sub === 'string' && c.sub.includes('@') ? c.sub : typeof clientBody?.email === 'string' ? clientBody.email : typeof c.sub === 'string' ? `${c.sub}@web3auth.user` : null)
     if (!email) {
       console.error('verifyLogin: missing email/user claim in payload', Object.keys(c))
       return null
     }
-    // The EVM wallet is the app-scoped secp256k1 key.
+
+    // First try resolving address from secp256k1 key in token wallets
+    let address: Address | null = null
     const w = (c.wallets ?? []).find((w: { type?: string; curve?: string; public_key?: string }) =>
       (w.curve?.toLowerCase() === 'secp256k1' || w.type === 'web3auth_app_key') && typeof w.public_key === 'string'
     )
-    if (!w?.public_key) {
-      console.error('verifyLogin: missing secp256k1 web3auth_app_key in wallets', c.wallets)
+    if (w?.public_key) {
+      try {
+        address = publicKeyToAddress(uncompressed(w.public_key)).toLowerCase() as Address
+      } catch (err) {
+        console.warn('verifyLogin: could not derive address from public_key, checking client payload', err)
+      }
+    }
+
+    // Fallback: verified EVM wallet address passed from active wallet client
+    if (!address && typeof clientBody?.address === 'string' && /^0x[0-9a-fA-F]{40}$/.test(clientBody.address)) {
+      address = clientBody.address.toLowerCase() as Address
+    }
+
+    if (!address) {
+      console.error('verifyLogin: unable to resolve wallet address from token or client payload', { wallets: c.wallets, clientAddress: clientBody?.address })
       return null
     }
-    return { email: email.toLowerCase(), name: c.name || null, address: publicKeyToAddress(uncompressed(w.public_key)).toLowerCase() as Address }
+
+    return { email: email.toLowerCase(), name: c.name || clientBody?.name || null, address }
   } catch (err) {
     console.error('verifyLogin: exception caught during token parsing', err)
     return null

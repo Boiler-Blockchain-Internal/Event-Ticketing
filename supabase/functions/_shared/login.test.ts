@@ -46,3 +46,26 @@ test('rejects other projects, other issuers, expired, unknown keys and tampering
   assert.equal(await v(`${h}.${b64url(Buffer.from(JSON.stringify({ ...good, email: 'x@evil.com' })))}.${s}`), null)
   assert.equal(await v('not.a.jwt'), null)
 })
+
+test('validates token with omitted wallets when client address payload is provided', async () => {
+  const tokenNoWallet = await token({ iss: ISSUER, aud: 'client-1', exp: now / 1000 + 600, sub: 'user_123', email: 'ben@purdue.edu' })
+  const result = await verifyLogin(tokenNoWallet, 'client-1', now, jwks, { address: wallet.address, name: 'Ben H.' })
+  assert.deepEqual(result, {
+    email: 'ben@purdue.edu',
+    name: 'Ben H.',
+    address: wallet.address.toLowerCase(),
+  })
+})
+
+test('validates token with verifierId fallback for email', async () => {
+  const tokenVerifierId = await token({
+    iss: ISSUER, aud: 'client-1', exp: now / 1000 + 600, verifierId: 'ben@purdue.edu',
+    wallets: [{ type: 'web3auth_app_key', curve: 'secp256k1', public_key: compressed(wallet.publicKey) }],
+  })
+  const result = await verifyLogin(tokenVerifierId, 'client-1', now, jwks)
+  assert.deepEqual(result, {
+    email: 'ben@purdue.edu',
+    name: null,
+    address: wallet.address.toLowerCase(),
+  })
+})

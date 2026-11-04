@@ -63,7 +63,15 @@ function useView(): { view: View | null; error: string | null } {
   useEffect(() => {
     if (!ME_URL || !account.signedIn) return
     account.idToken().then(async token => {
-      const res = await fetch(ME_URL!, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const [address, info] = await Promise.all([
+        account.address(),
+        account.userInfo(),
+      ])
+      const res = await fetch(ME_URL!, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, email: info?.email, name: info?.name }),
+      })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(body.error ?? 'Something went wrong. Try again.')
       const name = body.user.name ?? body.user.email

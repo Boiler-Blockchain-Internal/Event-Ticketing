@@ -17,20 +17,22 @@ const config = {
 export const LiveProvider = ({ children }: { children: ReactNode }) => <Web3AuthProvider config={config}>{children}</Web3AuthProvider>
 
 export function useLiveAccount(): Account {
-  const { connection, isConnected, isInitialized } = useWeb3Auth()
+  const { connection, isConnected, isInitialized, web3Auth } = useWeb3Auth()
   const { connectTo } = useWeb3AuthConnect()
   const { disconnect } = useWeb3AuthDisconnect()
   const { getAuthTokenInfo } = useAuthTokenInfo()
   const provider = connection?.ethereumProvider
+  const client = useMemo(() => provider ? createWalletClient({ transport: custom(provider) }) : null, [provider])
   const signer = useMemo<Signer | undefined>(() => {
-    if (!provider) return
-    const client = createWalletClient({ transport: custom(provider) })
+    if (!client) return
     return { signMessage: async ({ message }) => client.signMessage({ account: (await client.getAddresses())[0], message }) }
-  }, [provider])
+  }, [client])
   return {
     ready: isInitialized,
     signedIn: isConnected,
     signer,
+    address: async () => client ? (await client.getAddresses())[0] : null,
+    userInfo: async () => web3Auth ? web3Auth.getUserInfo() : null,
     idToken: getAuthTokenInfo,
     signIn: async email => {
       // connectTo skips MetaMask's own picker, which would show attendees wallet options.
