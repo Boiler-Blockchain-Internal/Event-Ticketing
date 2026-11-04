@@ -43,7 +43,14 @@ export function Redeem() {
         </dl>
       </section>
 
-      {sentTo ? (
+      {account.signedIn ? (
+        <section className="sent intro" aria-live="polite">
+          <h2>You're signed in</h2>
+          <p className="muted">Your passes are ready in your account.</p>
+          <a href="#/tickets" className="btn btn-primary btn-block">View my passes <Arrow /></a>
+          <button className="link-btn" onClick={() => account.signOut().then(() => window.location.reload())}>Sign out</button>
+        </section>
+      ) : sentTo ? (
         <section className="sent intro" aria-live="polite">
           <h2>Check your inbox</h2>
           <p className="muted">We sent a sign-in link to <b>{sentTo}</b>. Open it on this phone to claim your pass.</p>

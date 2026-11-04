@@ -104,7 +104,14 @@ export function Tickets() {
           : <span className="avatar" aria-label={view.user.name}>{view.user.initials}</span>)}
       </header>
 
-      {error ? <p className="note" role="alert">{error}</p> : !view ? <p className="note" aria-live="polite">Loading your passes…</p> : (
+      {error ? (
+        <section className="intro">
+          <p className="note" role="alert">{error}</p>
+          <button className="btn btn-primary btn-block" onClick={() => account.signOut().then(() => window.location.reload())}>
+            Sign out & retry
+          </button>
+        </section>
+      ) : !view ? <p className="note" aria-live="polite">Loading your passes…</p> : (
         <>
           <div className="segmented" role="tablist">
             <button role="tab" aria-selected={tab === 'passes'} onClick={() => setTab('passes')}>Passes</button>

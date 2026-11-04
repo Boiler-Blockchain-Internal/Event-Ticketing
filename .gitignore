@@ -8,3 +8,4 @@ contracts/ignition/deployments/**/build-info
 contracts/ignition/deployments/**/artifacts
 .env
 .env.local
+supabase/.temp
