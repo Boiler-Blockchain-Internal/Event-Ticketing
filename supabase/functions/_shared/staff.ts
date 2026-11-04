@@ -1,8 +1,14 @@
 // Door-staff link token: `<eventId>.<expires unix seconds>.<HMAC-SHA256>`, signed with STAFF_LINK_SECRET.
 // Scoped to one event, expires, grants nothing but scanning. WebCrypto only, so it runs in Deno and Node.
 const enc = new TextEncoder()
-const b64url = (b: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-export const unb64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+const b64url = (b: ArrayBuffer) =>
+  btoa(String.fromCharCode(...new Uint8Array(b)))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+
+export const unb64url = (s: string) =>
+  Uint8Array.from(atob(s.replaceAll('-', '+').replaceAll('_', '/')), c => c.charCodeAt(0))
 const hmacKey = (secret: string) =>
   crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])
 
