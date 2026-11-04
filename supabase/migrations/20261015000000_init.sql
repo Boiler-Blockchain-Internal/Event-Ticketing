@@ -14,14 +14,17 @@ create table users (
 );
 
 create table events (
-  id        text primary key check (id ~ '^[A-Za-z0-9_-]+$'), -- appears in QR payloads
-  org_id    uuid not null references orgs,
-  kind      text not null default 'event' check (kind in ('event', 'membership')),
-  name      text not null,
-  starts_at timestamptz,
-  venue     text,
-  capacity  int check (capacity > 0)
+  id             text primary key check (id ~ '^[A-Za-z0-9_-]+$'), -- appears in QR payloads
+  org_id         uuid not null references orgs,
+  kind           text not null default 'event' check (kind in ('event', 'membership')),
+  name           text not null,
+  starts_at      timestamptz,
+  doors_open_at  timestamptz,
+  doors_close_at timestamptz,
+  venue          text,
+  capacity       int check (capacity > 0)
 );
+create index on events (org_id);
 
 -- Mirror of the on-chain credential, keyed by token ID.
 -- ponytail: owner check reads this mirror; read ownerOf from the contract once it is deployed.
@@ -34,13 +37,16 @@ create table credentials (
   metadata_hash text
 );
 create index on credentials (holder_id);
+create index on credentials (event_id);
+create index on credentials (reissued_as);
 
 create table checkins (
   event_id      text not null references events,
   credential_id numeric(78) not null references credentials,
   checked_in_at timestamptz not null default now(),
-  unique (event_id, credential_id) -- two scanners racing cannot both admit
+  primary key (event_id, credential_id) -- two scanners racing cannot both admit
 );
+create index on checkins (credential_id);
 
 -- ponytail: rows older than the 60s QR window are dead weight; add a pg_cron delete when the table grows.
 create table nonces (
@@ -52,7 +58,9 @@ create table nonces (
 -- Returns 'admit', 'repeat' (with the first check-in time) or 'replay' (nonce already used).
 create function check_in(p_event text, p_credential numeric, p_nonce text)
 returns table (result text, checked_in_at timestamptz)
-language plpgsql as $$
+language plpgsql
+set search_path = public
+as $$
 begin
   return query select 'repeat'::text, c.checked_in_at from checkins c
     where c.event_id = p_event and c.credential_id = p_credential;
@@ -83,12 +91,12 @@ alter table credentials enable row level security;
 alter table checkins enable row level security;
 alter table nonces enable row level security;
 
-create policy "read own profile" on users for select using (id = auth.uid());
+create policy "read own profile" on users for select using (id = (select auth.uid()));
 create policy "read events" on events for select using (true);
 create policy "read orgs" on orgs for select using (true);
-create policy "read own credentials" on credentials for select using (holder_id = auth.uid());
+create policy "read own credentials" on credentials for select using (holder_id = (select auth.uid()));
 create policy "read own checkins" on checkins for select using (
-  exists (select 1 from credentials c where c.id = credential_id and c.holder_id = auth.uid())
+  exists (select 1 from credentials c where c.id = credential_id and c.holder_id = (select auth.uid()))
 );
 
 revoke execute on function check_in from public, anon, authenticated;
