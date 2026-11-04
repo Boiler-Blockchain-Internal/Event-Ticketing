@@ -27,7 +27,7 @@ npm test -w contracts  # hardhat unit tests (9 tests)
    ```
 2. Populate the environment variables in `.env.local`:
    - `VITE_SUPABASE_URL`: Found in the Supabase Dashboard under **Project Settings > Data API > Project URL** (e.g. `https://<project-ref>.supabase.co`).
-   - `STAFF_LINK_SECRET`: A shared HMAC passphrase for signing and verifying door-staff links.
+   - `STAFF_LINK_SECRET`: A shared HMAC passphrase for signing and verifying door-staff links (obtain from project lead or team password vault).
 3. In the Supabase project dashboard (**Project Settings > Edge Functions > Secrets**), ensure `STAFF_LINK_SECRET` is added with the same secret passphrase.
 4. Generate an expiring door-staff scan link:
    ```bash
