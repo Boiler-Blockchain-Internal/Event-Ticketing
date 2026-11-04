@@ -9,6 +9,7 @@
     "test": "node --test src/*.test.ts ../supabase/functions/_shared/*.test.ts"
   },
   "dependencies": {
+    "@privy-io/react-auth": "^3.51.1",
     "qrcode-generator": "^2.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
