@@ -31,7 +31,7 @@ npm install            # Install workspace dependencies
 npm run dev            # Start web dev server (http://localhost:5173)
 npm run compile        # Compile contracts with Hardhat (solc 0.8.28)
 npm test -w contracts  # Run 11 Hardhat contract tests (viem + node:test)
-npm test -w web        # Run 6 web & shared crypto unit tests (node:test)
+npm test -w web        # Run 11 web & shared crypto/Supabase unit tests (node:test)
 npm run build -w web   # Typecheck and production build web app
 ```
 
