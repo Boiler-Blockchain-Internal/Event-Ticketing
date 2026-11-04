@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { network } from 'hardhat'
 import { keccak256, toHex } from 'viem'
+import PassmarkModule from '../ignition/modules/Passmark.ts'
 
-const { viem } = await network.create()
+const { viem, ignition } = await network.create()
 const [admin, issuer, alice, bob, stranger] = await viem.getWalletClients()
 
 const EVENT = 1n
@@ -123,5 +124,20 @@ describe('Passmark', () => {
     const { pass } = await setup()
     await viem.assertions.revertWithCustomErrorWithArgs(pass.write.mint([alice.account.address, 9n, HASH]), pass, 'UnknownEvent', [9n])
     await viem.assertions.revertWithCustomErrorWithArgs(pass.write.registerEvent([EVENT, bob.account.address]), pass, 'EventExists', [EVENT])
+  })
+
+  it('deploys via Hardhat Ignition module and grants admin role to account 0 by default', async () => {
+    const { passmark } = await ignition.deploy(PassmarkModule)
+    const defaultAdminRole = await passmark.read.DEFAULT_ADMIN_ROLE()
+    const hasAdmin = await passmark.read.hasRole([defaultAdminRole, admin.account.address])
+    assert.equal(hasAdmin, true)
+  })
+
+  it('deploys via Hardhat Ignition module with an explicit admin parameter', async () => {
+    const { passmark } = await ignition.deploy(PassmarkModule, {
+      parameters: { Passmark: { admin: issuer.account.address } },
+    })
+    const defaultAdminRole = await passmark.read.DEFAULT_ADMIN_ROLE()
+    assert.equal(await passmark.read.hasRole([defaultAdminRole, issuer.account.address]), true)
   })
 })
