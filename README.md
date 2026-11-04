@@ -28,7 +28,11 @@ npm test -w contracts  # hardhat unit tests (11 tests)
 2. Populate the environment variables in `.env.local`:
    - `VITE_SUPABASE_URL`: Found in the Supabase Dashboard under **Project Settings > Data API > Project URL** (e.g. `https://<project-ref>.supabase.co`).
    - `STAFF_LINK_SECRET`: A shared HMAC passphrase for signing and verifying door-staff links (obtain from project lead or team password vault).
-3. In the Supabase project dashboard (**Project Settings > Edge Functions > Secrets**), ensure `STAFF_LINK_SECRET` is added with the same secret passphrase.
+   - `VITE_WEB3AUTH_CLIENT_ID`: (Optional for live sign-in) Client ID from [Web3Auth / MetaMask Dashboard](https://dashboard.web3auth.io). Leave blank to use local demo mode.
+   - `VITE_WEB3AUTH_NETWORK`: `devnet` (supports `http://localhost:5173`) or `mainnet`.
+3. In the Supabase project dashboard (**Project Settings > Edge Functions > Secrets**), add the runtime secrets:
+   - `STAFF_LINK_SECRET`: Same shared secret passphrase as above.
+   - `WEB3AUTH_CLIENT_ID`: Same client ID as `VITE_WEB3AUTH_CLIENT_ID` (required for `/functions/v1/me` ID token verification).
 4. Generate an expiring door-staff scan link:
    ```bash
    STAFF_LINK_SECRET=your_secret node scripts/staff-link.ts bb-fgm 12 http://localhost:5173
