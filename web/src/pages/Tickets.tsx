@@ -91,6 +91,12 @@ export function Tickets() {
   const [tab, setTab] = useState<'passes' | 'history'>('passes')
   const { view, error } = useView()
 
+  const handleSignOut = async () => {
+    await account.signOut()
+    window.location.hash = '#/redeem'
+    window.location.reload()
+  }
+
   if (account.ready && !account.signedIn) {
     return (
       <main className="app">
@@ -108,14 +114,14 @@ export function Tickets() {
         </a>
         <h1>My passes</h1>
         {view && (ME_URL
-          ? <button className="avatar" aria-label={`Sign out ${view.user.name}`} title="Sign out" onClick={() => account.signOut()}>{view.user.initials}</button>
+          ? <button className="avatar" aria-label={`Sign out ${view.user.name}`} title="Sign out" onClick={handleSignOut}>{view.user.initials}</button>
           : <span className="avatar" aria-label={view.user.name}>{view.user.initials}</span>)}
       </header>
 
       {error ? (
         <section className="intro">
           <p className="note" role="alert">{error}</p>
-          <button className="btn btn-primary btn-block" onClick={() => account.signOut().then(() => window.location.reload())}>
+          <button className="btn btn-primary btn-block" onClick={handleSignOut}>
             Sign out & retry
           </button>
         </section>
@@ -150,6 +156,11 @@ export function Tickets() {
               ))}
               {!view.history.length && <li><small>Events you check in to show up here.</small></li>}
             </ul>
+          )}
+          {ME_URL && (
+            <div style={{ marginTop: 'auto', textAlign: 'center', paddingTop: '1rem' }}>
+              <button className="link-btn" onClick={handleSignOut}>Sign out</button>
+            </div>
           )}
         </>
       )}

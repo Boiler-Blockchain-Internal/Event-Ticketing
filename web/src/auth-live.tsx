@@ -40,6 +40,8 @@ export function useLiveAccount(): Account {
         ? { authConnection: AUTH_CONNECTION.EMAIL_PASSWORDLESS, loginHint: email }
         : { authConnection: AUTH_CONNECTION.GOOGLE })
     },
-    signOut: () => disconnect(),
+    signOut: async () => {
+      await disconnect({ cleanup: true })
+    },
   }
 }
