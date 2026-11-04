@@ -62,18 +62,22 @@ function useView(): { view: View | null; error: string | null } {
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     if (!ME_URL || !account.signedIn) return
+    let cancelled = false
+    setError(null)
     account.idToken().then(async token => {
-      if (!token) return
+      if (!token || cancelled) return
       const [address, info] = await Promise.all([
         account.address(),
         account.userInfo(),
       ])
+      if (cancelled) return
       const res = await fetch(ME_URL!, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, email: info?.email, name: info?.name }),
       })
       const body = await res.json().catch(() => ({}))
+      if (cancelled) return
       if (!res.ok) throw new Error(body.error ?? 'Something went wrong. Try again.')
       const name = body.user.name ?? body.user.email
       setView({
@@ -82,7 +86,10 @@ function useView(): { view: View | null; error: string | null } {
         history: body.passes.filter((p: PassInfo) => p.checkedInAt)
           .map((p: PassInfo) => ({ id: p.credentialId, name: p.name, org: p.org, date: day(p.checkedInAt)! })),
       })
-    }).catch(e => setError(e instanceof TypeError ? 'No connection · reload to retry' : e.message))
+    }).catch(e => {
+      if (!cancelled) setError(e instanceof TypeError ? 'No connection · reload to retry' : e.message)
+    })
+    return () => { cancelled = true }
   }, [account.signedIn])
   return { view, error }
 }

@@ -48,16 +48,24 @@ export function supabaseDeps(url: string, serviceKey: string) {
     },
     // Creates or refreshes the user keyed by wallet. Throws `Supabase 409` if the email already has another wallet.
     async saveUser(login: Login): Promise<string> {
-      const [u] = await get('users?on_conflict=wallet_address&select=id', {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ email: login.email, name: login.name, wallet_address: login.address }),
-      })
-      return u.id
+      try {
+        const [u] = await get('users?on_conflict=wallet_address&select=id', {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
+          body: JSON.stringify({ email: login.email, name: login.name, wallet_address: login.address }),
+        })
+        return u.id
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('Supabase 409')) {
+          const [existing] = await get(`users?wallet_address=eq.${encodeURIComponent(login.address)}&select=id`)
+          if (existing?.id) return existing.id
+        }
+        throw e
+      }
     },
     async passesFor(userId: string): Promise<PassInfo[]> {
       const rows = await get(`credentials?holder_id=eq.${userId}&reissued_as=is.null&order=id.desc` +
-        '&select=id::text,status,events(id,kind,name,starts_at,venue,orgs(name)),checkins(checked_in_at)')
+        '&select=id::text,status,events!credentials_event_id_fkey(id,kind,name,starts_at,venue,orgs(name)),checkins(checked_in_at)')
       return rows.map((r: any) => ({
         credentialId: r.id, eventId: r.events.id, kind: r.events.kind, status: r.status,
         name: r.events.name, org: r.events.orgs.name, startsAt: r.events.starts_at, venue: r.events.venue,
