@@ -15,9 +15,11 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
   - `src/router.ts`: hash routing via `useSyncExternalStore`. No react-router.
   - `src/data.ts`: mock data, stands in until the backend and contract exist.
   - `src/verify.ts`: door-side scan check. Local stand-in for the real backend check.
+  - `src/auth.tsx`: `useAccount()`: MetaMask Embedded Wallets login + signer when `VITE_WEB3AUTH_CLIENT_ID` and `VITE_SUPABASE_URL` are set, else a demo key.
   - `src/pages/`, `src/components/`: screens and UI pieces (`Qr.tsx`, `HeroTicket.tsx`, `Logo.tsx`).
-- `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
+- `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `login.ts` MetaMask ID-token check (ES256 via WebCrypto) and wallet address; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
 - `supabase/functions/scan/`: the scan edge function (`verify_jwt = false` in `config.toml`; the staff token is the auth).
+- `supabase/functions/me/`: saves the signed-in attendee + wallet, returns their passes (`verify_jwt = false`; MetaMask's ID token is the auth). Needs `WEB3AUTH_CLIENT_ID`.
 - `scripts/staff-link.ts`: prints a door-staff link until the admin dashboard exists.
 - `supabase/migrations/`: Postgres schema, RLS, and the atomic `check_in` function.
 - `contracts/`: Hardhat 3 + viem (not Foundry), OpenZeppelin v5 ERC-721 + ERC-5192 (`contracts/contracts/Passmark.sol`), Hardhat Ignition module (`ignition/modules/Passmark.ts`), 9 unit tests (`test/Passmark.ts`).
@@ -49,7 +51,7 @@ npm run build -w web   # typecheck and build web app
 - On-chain: credential ID, holder address, event ID, issuer, status, metadata hash. **Never** emails, names, or other personal data.
 - Off-chain (Postgres on Supabase): event details, users, wallet mapping, check-ins, nonces.
 - Chain: Base (Sepolia testnet first). Contracts: Solidity + Foundry + OpenZeppelin.
-- Wallets: embedded-wallet provider (Privy / Dynamic / Web3Auth, not yet picked) with email/Google login. Platform pays gas.
+- Wallets: MetaMask Embedded Wallets (formerly Web3Auth; packages are still `@web3auth/*`) with email/Google login. No extension. Platform pays gas.
 - QR payload: credential ID, event ID, issued-at, nonce, signed by the holder's wallet. Refreshes every 30s.
 - Server scan check: signature recovers to the on-chain owner, timestamp within 60s, not revoked, event matches, nonce unseen.
 - Atomic check-in: `UNIQUE (event_id, credential_id)` in Postgres. Two scanners racing cannot both admit.
@@ -70,7 +72,8 @@ Out of scope: payments, resale/marketplace, multi-chain, native apps. Stretch on
 ## Decided
 
 - Backend: Supabase edge functions (Deno). Shared logic in `supabase/functions/_shared/`.
+- Wallet provider: MetaMask Embedded Wallets (2026-11-04). Free Base plan: 1,000 monthly active wallets, its own email/Google login, no custom JWT or account abstraction (those are Growth, $69/mo).
 
 ## Open decisions (do not assume; ask)
 
-- Wallet provider, Base vs Optimism final pick, mainnet vs testnet for the pilot.
+- Base vs Optimism final pick (the Notion tasks page says Base), mainnet vs testnet for the pilot.

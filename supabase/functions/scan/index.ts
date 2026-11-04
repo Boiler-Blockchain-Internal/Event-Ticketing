@@ -4,13 +4,7 @@
 import { checkScan } from '../_shared/scan.ts'
 import { readStaffToken } from '../_shared/staff.ts'
 import { supabaseDeps } from '../_shared/supabase.ts'
-
-const cors = {
-  'Access-Control-Allow-Origin': '*', // auth is the token in the body, no cookies
-  'Access-Control-Allow-Headers': 'content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-const json = (body: unknown, status = 200) => Response.json(body, { status, headers: cors })
+import { cors, json } from '../_shared/http.ts'
 
 const deps = supabaseDeps(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const secret = Deno.env.get('STAFF_LINK_SECRET')
