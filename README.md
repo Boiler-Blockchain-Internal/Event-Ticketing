@@ -16,7 +16,7 @@ npm run dev            # web on http://localhost:5173
 npm run build          # typecheck + production build
 npm test -w web        # scan & backend verification unit tests
 npm run compile        # hardhat build
-npm test -w contracts  # hardhat unit tests (9 tests)
+npm test -w contracts  # hardhat unit tests (11 tests)
 ```
 
 ## Backend & Supabase Setup
@@ -25,8 +25,10 @@ npm test -w contracts  # hardhat unit tests (9 tests)
    ```bash
    cp .env.example .env.local
    ```
-2. Populate `VITE_SUPABASE_URL` and `STAFF_LINK_SECRET` in `.env.local`.
-3. In the Supabase project dashboard (**Project Settings > Edge Functions > Secrets**), add `STAFF_LINK_SECRET` with the same secret value.
+2. Populate the environment variables in `.env.local`:
+   - `VITE_SUPABASE_URL`: Found in the Supabase Dashboard under **Project Settings > Data API > Project URL** (e.g. `https://<project-ref>.supabase.co`).
+   - `STAFF_LINK_SECRET`: A shared HMAC passphrase for signing and verifying door-staff links (obtain from project lead or team password vault).
+3. In the Supabase project dashboard (**Project Settings > Edge Functions > Secrets**), ensure `STAFF_LINK_SECRET` is added with the same secret passphrase.
 4. Generate an expiring door-staff scan link:
    ```bash
    STAFF_LINK_SECRET=your_secret node scripts/staff-link.ts bb-fgm 12 http://localhost:5173
