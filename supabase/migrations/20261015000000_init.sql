@@ -98,5 +98,6 @@ create policy "read own credentials" on credentials for select using (holder_id 
 create policy "read own checkins" on checkins for select using (
   exists (select 1 from credentials c where c.id = credential_id and c.holder_id = (select auth.uid()))
 );
+create policy "no public access" on nonces for all using (false);
 
 revoke execute on function check_in from public, anon, authenticated;
