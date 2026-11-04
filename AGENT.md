@@ -42,6 +42,4 @@ npm run build -w web   # Typecheck and production build web app
 - **XP / Atomic Changes**: Keep pull requests small and focused (<5 files, <200 lines). Verify locally before committing.
 - **Testing**: Colocate unit tests (`*.test.ts`) using native `node:test` and `node:assert/strict`. No Jest or Vitest.
 - **Shortcuts**: Mark intentional trade-offs with `// ponytail:` explaining the limitation and upgrade path.
-- **Attribution**:
-  - Author: `BenHirschy33 <179422209+BenHirschy33@users.noreply.github.com>`
-  - Co-author: `Co-authored-by: Antigravity <agent@antigravity.local>`
+- **Commit Attribution**: Use standard Git authorship (`git config user.name` and `user.email`). When pairing with an AI assistant or co-contributor, stage attribution appropriately (e.g. `Co-authored-by: Name <email>`) according to the active contributor and tool.
