@@ -4,12 +4,14 @@ import { Landing } from './pages/Landing'
 import { Redeem } from './pages/Redeem'
 import { Tickets } from './pages/Tickets'
 import { Scan } from './pages/Scan'
+import { Admin } from './pages/Admin'
 
 const pages: Record<string, () => React.JSX.Element> = {
   '/': Landing,
   '/redeem': Redeem,
   '/tickets': Tickets,
   '/scan': Scan,
+  '/admin': Admin,
 }
 
 export default function App() {
