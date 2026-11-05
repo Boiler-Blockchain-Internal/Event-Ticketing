@@ -289,6 +289,20 @@ button.avatar { cursor: pointer; color: inherit; }
 .history li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--border); }
 .history b { display: block; }
 .history small { color: var(--text-muted); font-size: .8rem; }
+.skeleton { display: grid; gap: .8rem; }
+.sk { height: .8rem; border-radius: 6px; background: linear-gradient(90deg, #e4e0d6 30%, #efebe3 50%, #e4e0d6 70%) 0 0 / 300% 100%; animation: shimmer 1.4s linear infinite; }
+.sk-title { height: 1.5rem; width: 80%; }
+.sk-qr { width: 62%; aspect-ratio: 1; height: auto; justify-self: center; margin: .6rem 0; border-radius: var(--r-md); }
+.profile-menu { inset: auto; top: 68px; right: max(var(--gutter), calc(50vw - 220px + var(--gutter))); width: min(300px, calc(100vw - 2 * var(--gutter)));
+  margin: 0; padding: 1rem; display: none; gap: .5rem; text-align: left; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 20px 40px -12px rgba(0,0,0,.6); }
+.profile-menu:popover-open { display: grid; animation: pop .2s var(--ease) both; }
+.profile-menu small { color: var(--text-muted); font-size: .8rem; overflow-wrap: anywhere; }
+.profile-id { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin: .4rem 0; padding: .7rem .8rem; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border); }
+.profile-id span { display: grid; gap: .2rem; }
+.profile-id code { font: 500 .85rem var(--font-mono); }
+.btn-danger { color: var(--red); background: rgba(240, 96, 93, .1); border-color: rgba(240, 96, 93, .35); }
+.btn-danger:hover { background: rgba(240, 96, 93, .18); }
+.spinner { display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.125em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
 
 /* scan */
 .scan-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
@@ -330,6 +344,8 @@ button.avatar { cursor: pointer; color: inherit; }
 @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 @keyframes float-in { from { opacity: 0; transform: translateY(40px) rotate(-3deg) scale(.96); } to { opacity: 1; transform: rotate(-2deg); } }
 @keyframes pop { 0% { opacity: 0; transform: scale(.7); } 70% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes shimmer { to { background-position: -150% 0; } }
+@keyframes spin { to { transform: rotate(1turn); } }
 @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 .intro { opacity: 0; animation: rise var(--dur) var(--ease) forwards; animation-delay: calc(var(--i, 0) * 90ms + 100ms); }
@@ -348,4 +364,5 @@ button.avatar { cursor: pointer; color: inherit; }
   .ticket-bar span { animation: none !important; }
   .ticket.ticket-app { transform: none; }
   .scan-result { animation: none; }
+  .sk, .profile-menu:popover-open { animation: none; }
 }

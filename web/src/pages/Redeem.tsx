@@ -9,7 +9,8 @@ export function Redeem() {
   const eventId = routeParam('e') || event.id
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [claiming, setClaiming] = useState(false)
+  // What we're waiting on, shown so the gap between sign-in and passes doesn't look frozen.
+  const [busy, setBusy] = useState<string | null>(null)
 
   const handleSignOut = async () => {
     try {
@@ -25,7 +26,7 @@ export function Redeem() {
       navigate('/tickets')
       return
     }
-    setClaiming(true)
+    setBusy('Setting up your pass…')
     setError(null)
     try {
       let token = await account.idToken()
@@ -58,16 +59,17 @@ export function Redeem() {
     } catch (err: any) {
       setError(err instanceof TypeError ? 'No connection · reload to retry' : err?.message || 'Something went wrong.')
     } finally {
-      setClaiming(false)
+      setBusy(null)
     }
   }
 
   // Live: MetaMask's sign-in window (Google, or a code sent to the email). Demo: lands on the demo pass.
   const signIn = (email?: string) => {
     setError(null)
+    setBusy('Signing you in…')
     account.signIn(email).then(
       () => claimAndNavigate(),
-      () => setError("Sign-in didn't finish. Try again.")
+      () => { setBusy(null); setError("Sign-in didn't finish. Try again.") }
     )
   }
   const submit = (e: FormEvent<HTMLFormElement>) => {
@@ -104,11 +106,18 @@ export function Redeem() {
           <h2>You're signed in</h2>
           <p className="muted">Your passes are ready in your account.</p>
           {error && <p className="note" role="alert">{error}</p>}
-          <button className="btn btn-primary btn-block" disabled={claiming} onClick={claimAndNavigate}>
-            {claiming ? 'Setting up your pass…' : <>Claim this pass <Arrow /></>}
+          <button className="btn btn-primary btn-block" disabled={!!busy} onClick={claimAndNavigate}>
+            {busy ? <><span className="spinner" aria-hidden="true" />{busy}</> : <>Claim this pass <Arrow /></>}
           </button>
           <a href="#/tickets" className="btn btn-ghost btn-block">View my passes</a>
           <button className="link-btn" onClick={handleSignOut}>Sign out</button>
+        </section>
+      ) : busy ? (
+        <section className="sent intro" aria-live="polite">
+          <h2><span className="spinner" aria-hidden="true" />{busy}</h2>
+          <p className="muted">Finish in the sign-in window. This can take a few seconds.</p>
+          {/* Escape hatch if the sign-in window is closed without telling us. */}
+          <button className="link-btn" onClick={() => setBusy(null)}>Cancel</button>
         </section>
       ) : sentTo ? (
         <section className="sent intro" aria-live="polite">
