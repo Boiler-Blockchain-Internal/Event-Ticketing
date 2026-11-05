@@ -11,6 +11,19 @@ export type ClaimTarget = {
   activeCount: number
   existingCredentialId: string | null
 }
+
+export type EventRecord = {
+  id: string
+  orgId: string
+  kind: 'event' | 'membership'
+  name: string
+  startsAt: string | null
+  doorsOpenAt: string | null
+  doorsCloseAt: string | null
+  venue: string | null
+  capacity: number | null
+}
+
 export type CreateEventInput = {
   id: string
   name: string
@@ -66,16 +79,24 @@ export function supabaseDeps(url: string, serviceKey: string) {
     },
     // Creates or refreshes the user keyed by wallet. Throws `Supabase 409` if the email already has another wallet.
     async saveUser(login: Login): Promise<string> {
-      const [u] = await get('users?on_conflict=wallet_address&select=id', {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ email: login.email, name: login.name, wallet_address: login.address }),
-      })
-      return u.id
+      try {
+        const [u] = await get('users?on_conflict=wallet_address&select=id', {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=representation' },
+          body: JSON.stringify({ email: login.email, name: login.name, wallet_address: login.address }),
+        })
+        return u.id
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('Supabase 409')) {
+          const [existing] = await get(`users?wallet_address=eq.${encodeURIComponent(login.address)}&select=id`)
+          if (existing?.id) return existing.id
+        }
+        throw e
+      }
     },
     async passesFor(userId: string): Promise<PassInfo[]> {
       const rows = await get(`credentials?holder_id=eq.${userId}&reissued_as=is.null&order=id.desc` +
-        '&select=id::text,status,events(id,kind,name,starts_at,venue,orgs(name)),checkins(checked_in_at)')
+        '&select=id::text,status,events!credentials_event_id_fkey(id,kind,name,starts_at,venue,orgs(name)),checkins(checked_in_at)')
       return rows.map((r: any) => ({
         credentialId: r.id, eventId: r.events.id, kind: r.events.kind, status: r.status,
         name: r.events.name, org: r.events.orgs.name, startsAt: r.events.starts_at, venue: r.events.venue,
@@ -84,7 +105,7 @@ export function supabaseDeps(url: string, serviceKey: string) {
     },
     async claimInfo(eventId: string, userId: string): Promise<ClaimTarget> {
       const [e] = await get(
-        `events?id=eq.${encodeURIComponent(eventId)}&select=id,name,capacity,credentials(id::text,holder_id,status)`
+        `events?id=eq.${encodeURIComponent(eventId)}&select=id,name,capacity,credentials!credentials_event_id_fkey(id::text,holder_id,status)`
       )
       if (!e) return { event: null, activeCount: 0, existingCredentialId: null }
       const creds = Array.isArray(e.credentials) ? e.credentials : []
@@ -111,7 +132,7 @@ export function supabaseDeps(url: string, serviceKey: string) {
     },
     async getOrCreateOrg(name = 'Boiler Blockchain'): Promise<string> {
       const rows = await get(`orgs?name=eq.${encodeURIComponent(name)}&select=id`)
-      if (rows[0]?.id) return rows[0].id
+      if (rows[0]?.id) return rows[0]?.id
       const [created] = await get('orgs?select=id', {
         method: 'POST',
         headers: { ...headers, Prefer: 'return=representation' },
@@ -119,7 +140,33 @@ export function supabaseDeps(url: string, serviceKey: string) {
       })
       return created.id
     },
-    async createEvent(input: CreateEventInput): Promise<{ id: string; name: string }> {
+    async getEvent(id: string): Promise<EventRecord | null> {
+      const [e] = await get(
+        `events?id=eq.${encodeURIComponent(id)}&select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity`
+      )
+      if (!e) return null
+      return {
+        id: e.id,
+        orgId: e.org_id,
+        kind: e.kind,
+        name: e.name,
+        startsAt: e.starts_at,
+        doorsOpenAt: e.doors_open_at,
+        doorsCloseAt: e.doors_close_at,
+        venue: e.venue,
+        capacity: e.capacity,
+      }
+    },
+    async createEvent(input: CreateEventInput): Promise<EventRecord> {
+      if (!/^[A-Za-z0-9_-]+$/.test(input.id)) {
+        throw new Error('Event ID must only contain letters, numbers, underscores, and hyphens')
+      }
+      if (!input.name || !input.name.trim()) {
+        throw new Error('Event name is required')
+      }
+      if (input.capacity != null && (typeof input.capacity !== 'number' || input.capacity <= 0)) {
+        throw new Error('Capacity must be a positive number')
+      }
       const orgId = input.orgId ?? (await this.getOrCreateOrg(input.orgName || 'Boiler Blockchain'))
       const payload = {
         id: input.id,
@@ -132,12 +179,25 @@ export function supabaseDeps(url: string, serviceKey: string) {
         venue: input.venue ?? null,
         capacity: input.capacity ?? null,
       }
-      const [row] = await get('events?select=id,name', {
-        method: 'POST',
-        headers: { ...headers, Prefer: 'return=representation' },
-        body: JSON.stringify(payload),
-      })
-      return { id: row.id, name: row.name }
+      const [row] = await get(
+        'events?select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity',
+        {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'return=representation' },
+          body: JSON.stringify(payload),
+        }
+      )
+      return {
+        id: row.id,
+        orgId: row.org_id,
+        kind: row.kind,
+        name: row.name,
+        startsAt: row.starts_at,
+        doorsOpenAt: row.doors_open_at,
+        doorsCloseAt: row.doors_close_at,
+        venue: row.venue,
+        capacity: row.capacity,
+      }
     },
   }
 }

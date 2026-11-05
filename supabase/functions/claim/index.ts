@@ -43,8 +43,7 @@ Deno.serve(async req => {
   }
 
   const token = req.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
-  // Pass body as 5th argument so client-provided address fallback works seamlessly with PR #22
-  const login = await (verifyLogin as any)(token, clientId, Date.now(), undefined, body)
+  const login = await verifyLogin(token, clientId, Date.now(), undefined, body)
   if (!login) return json({ error: 'Your sign-in expired. Sign in again.' }, 401)
 
   const eventId = typeof body.eventId === 'string' ? body.eventId.trim() : null

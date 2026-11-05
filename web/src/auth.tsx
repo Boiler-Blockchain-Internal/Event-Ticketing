@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Hex } from 'viem'
+import type { Address, Hex } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import type { Signer } from '../../supabase/functions/_shared/pass.ts'
 
@@ -14,6 +14,8 @@ export type Account = {
   ready: boolean
   signedIn: boolean
   signer?: Signer
+  address(): Promise<Address | null>
+  userInfo(): Promise<{ email?: string; name?: string } | null>
   idToken(): Promise<string | null>
   signIn(email?: string): Promise<void> // no email = Google
   signOut(): Promise<void>
@@ -32,8 +34,11 @@ function demoSigner() {
   }
   return privateKeyToAccount(key as Hex)
 }
+const demoAccount = demoSigner()
 const demo: Account = {
-  ready: true, signedIn: true, signer: demoSigner(),
+  ready: true, signedIn: true, signer: demoAccount,
+  address: async () => demoAccount.address,
+  userInfo: async () => ({ email: 'priya@purdue.edu', name: 'Priya S.' }),
   idToken: async () => null, signIn: async () => {}, signOut: async () => {},
 }
 

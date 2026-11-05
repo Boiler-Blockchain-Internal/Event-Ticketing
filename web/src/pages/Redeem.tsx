@@ -21,8 +21,8 @@ export function Redeem() {
     try {
       const [token, address, info] = await Promise.all([
         account.idToken(),
-        (account as any).address ? (account as any).address() : null,
-        (account as any).userInfo ? (account as any).userInfo() : null,
+        account.address(),
+        account.userInfo(),
       ])
       if (!token) throw new Error('Sign-in required to claim pass.')
       const res = await fetch(CLAIM_URL, {

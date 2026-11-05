@@ -59,6 +59,14 @@ export const passmarkAbi = [
 export const DEFAULT_CONTRACT_ADDRESS = '0x256c1A87b79f28de3989cBf1742144E3Ca21705C' as Address
 export const DEFAULT_RPC_URL = 'https://sepolia.base.org'
 
+// Validates whether a string is a valid 32-byte hex private key.
+export function isValidPrivateKey(key?: string | null): boolean {
+  if (!key) return false
+  const trimmed = key.trim().replace(/^['"]|['"]$/g, '')
+  const formatted = trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`
+  return /^0x[0-9a-fA-F]{64}$/.test(formatted)
+}
+
 // Deterministic mapping of human-readable slug (e.g. 'bb-fgm') to on-chain uint256 ID.
 export function toChainEventId(slug: string): bigint {
   return BigInt(keccak256(toHex(slug)))
@@ -83,19 +91,17 @@ export type ChainRelayer = {
   ): Promise<{ txHash: Hash; tokenId: string; onChainId: bigint }>
 }
 
-export function isValidPrivateKey(k?: string | null): boolean {
-  if (!k) return false
-  const clean = k.replace(/^0x/, '').trim()
-  return /^[0-9a-fA-F]{64}$/.test(clean)
-}
-
 export function createChainRelayer(
   privateKey: Hex | string,
   contractAddress: Address = DEFAULT_CONTRACT_ADDRESS,
   rpcUrl: string = DEFAULT_RPC_URL,
 ): ChainRelayer {
-  const clean = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`).trim() as Hex
-  const account = privateKeyToAccount(clean)
+  const trimmed = privateKey.trim().replace(/^['"]|['"]$/g, '')
+  const formattedKey = (trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`) as Hex
+  if (!isValidPrivateKey(formattedKey)) {
+    throw new Error('DEPLOYER_PRIVATE_KEY must be a valid 32-byte hex string (64 characters with optional 0x prefix)')
+  }
+  const account = privateKeyToAccount(formattedKey)
   const publicClient = createPublicClient({
     chain: baseSepolia,
     transport: http(rpcUrl),

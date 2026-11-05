@@ -20,6 +20,7 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 - `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `login.ts` MetaMask ID-token check (ES256 via WebCrypto) and wallet address; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
 - `supabase/functions/scan/`: the scan edge function (`verify_jwt = false` in `config.toml`; the staff token is the auth).
 - `supabase/functions/me/`: saves the signed-in attendee + wallet, returns their passes (`verify_jwt = false`; MetaMask's ID token is the auth). Needs `WEB3AUTH_CLIENT_ID`.
+- `supabase/functions/events/`: creates events in Postgres and registers on Base Sepolia (`verify_jwt = false`). Returns claim and staff scan URLs.
 - `supabase/functions/claim/`: attendee pass claim and platform-sponsored minting on Base Sepolia (`verify_jwt = false`). Needs `DEPLOYER_PRIVATE_KEY` and `WEB3AUTH_CLIENT_ID`.
 - `scripts/staff-link.ts`: prints a door-staff link until the admin dashboard exists.
 - `supabase/migrations/`: Postgres schema, RLS, and the atomic `check_in` function.

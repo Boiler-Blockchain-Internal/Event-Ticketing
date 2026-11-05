@@ -274,6 +274,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space
 .app-bar h1 { font-size: 1.1rem; letter-spacing: -.01em; }
 .icon-btn, .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); }
 .avatar { font-size: .8rem; font-weight: 600; }
+button.avatar { cursor: pointer; color: inherit; }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border); }
 .segmented button { min-height: 40px; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-muted); font: 600 .9rem var(--font-sans); cursor: pointer; transition: background .2s, color .2s; }
 .segmented button[aria-selected="true"] { background: var(--text); color: var(--paper-ink); }

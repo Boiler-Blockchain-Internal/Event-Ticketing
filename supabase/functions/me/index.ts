@@ -14,7 +14,8 @@ Deno.serve(async req => {
   if (!clientId) return json({ error: 'Sign-in is not set up yet' }, 500)
 
   const token = req.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
-  const login = await verifyLogin(token, clientId)
+  const body = await req.json().catch(() => ({}))
+  const login = await verifyLogin(token, clientId, Date.now(), undefined, body)
   if (!login) return json({ error: 'Your sign-in expired. Sign in again.' }, 401)
 
   try {
