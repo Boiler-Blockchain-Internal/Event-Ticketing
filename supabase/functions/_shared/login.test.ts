@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
-import { ISSUER, uncompressed, verifyLogin } from './login.ts'
+import { CITADEL_ISSUER, ISSUER, uncompressed, verifyLogin } from './login.ts'
 
 const now = 1_800_000_000_000
 const wallet = privateKeyToAccount(generatePrivateKey())
@@ -35,6 +35,26 @@ test('valid token yields email, name and the wallet address', async () => {
   })
 })
 
+test('validates Web3Auth v11 Citadel issuer tokens', async () => {
+  const citadelToken = await token({
+    iss: CITADEL_ISSUER, aud: 'client-1', exp: now / 1000 + 600, email: 'citadel@purdue.edu', name: 'Citadel User',
+    wallets: [{ type: 'web3auth_app_key', curve: 'secp256k1', public_key: compressed(wallet.publicKey) }],
+  })
+  assert.deepEqual(await verifyLogin(citadelToken, 'client-1', now, jwks), {
+    email: 'citadel@purdue.edu', name: 'Citadel User', address: wallet.address.toLowerCase(),
+  })
+})
+
+test('validates Web3Auth v11 bare web3auth.io issuer tokens with ethereum address claim', async () => {
+  const citadelToken = await token({
+    iss: 'web3auth.io', aud: 'client-1', exp: now / 1000 + 600, email: 'citadel-attendee@purdue.edu', name: 'Citadel Attendee',
+    wallets: [{ address: wallet.address, type: 'ethereum' }],
+  })
+  assert.deepEqual(await verifyLogin(citadelToken, 'client-1', now, jwks), {
+    email: 'citadel-attendee@purdue.edu', name: 'Citadel Attendee', address: wallet.address.toLowerCase(),
+  })
+})
+
 test('rejects other projects, other issuers, expired, unknown keys and tampering', async () => {
   const v = async (t: string) => verifyLogin(t, 'client-1', now, jwks)
   assert.equal(await v(await token({ ...good, aud: 'client-2' })), null)
@@ -45,4 +65,27 @@ test('rejects other projects, other issuers, expired, unknown keys and tampering
   const [h, , s] = (await token(good)).split('.')
   assert.equal(await v(`${h}.${b64url(Buffer.from(JSON.stringify({ ...good, email: 'x@evil.com' })))}.${s}`), null)
   assert.equal(await v('not.a.jwt'), null)
+})
+
+test('validates token with omitted wallets when client address payload is provided', async () => {
+  const tokenNoWallet = await token({ iss: ISSUER, aud: 'client-1', exp: now / 1000 + 600, sub: 'user_123', email: 'ben@purdue.edu' })
+  const result = await verifyLogin(tokenNoWallet, 'client-1', now, jwks, { address: wallet.address, name: 'Ben H.' })
+  assert.deepEqual(result, {
+    email: 'ben@purdue.edu',
+    name: 'Ben H.',
+    address: wallet.address.toLowerCase(),
+  })
+})
+
+test('validates token with verifierId fallback for email', async () => {
+  const tokenVerifierId = await token({
+    iss: ISSUER, aud: 'client-1', exp: now / 1000 + 600, verifierId: 'ben@purdue.edu',
+    wallets: [{ type: 'web3auth_app_key', curve: 'secp256k1', public_key: compressed(wallet.publicKey) }],
+  })
+  const result = await verifyLogin(tokenVerifierId, 'client-1', now, jwks)
+  assert.deepEqual(result, {
+    email: 'ben@purdue.edu',
+    name: null,
+    address: wallet.address.toLowerCase(),
+  })
 })

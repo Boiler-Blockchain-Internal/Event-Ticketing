@@ -172,6 +172,91 @@ test('handles PostgREST error responses by throwing descriptive error', async ()
   }
 })
 
+test('passesFor disambiguates events relationship and maps passes', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    let capturedUrl = ''
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      capturedUrl = String(url)
+      return new Response(
+        JSON.stringify([
+          {
+            id: '142',
+            status: 'active',
+            events: {
+              id: 'bb-fgm',
+              kind: 'event',
+              name: 'Fall General Meeting',
+              starts_at: '2026-11-12T19:00:00Z',
+              venue: 'Lawson B155',
+              orgs: { name: 'Boiler Blockchain' },
+            },
+            checkins: [],
+          },
+        ]),
+        { status: 200 },
+      )
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+    const passes = await deps.passesFor('user-1')
+    assert.match(capturedUrl, /events!credentials_event_id_fkey\(/)
+    assert.deepEqual(passes, [
+      {
+        credentialId: '142',
+        eventId: 'bb-fgm',
+        kind: 'event',
+        status: 'active',
+        name: 'Fall General Meeting',
+        org: 'Boiler Blockchain',
+        startsAt: '2026-11-12T19:00:00Z',
+        venue: 'Lawson B155',
+        checkedInAt: null,
+      },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('saveUser recovers from concurrent 409 insert race for the same wallet and throws for different wallet', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    let existingId: string | null = 'user-race-1'
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = String(url)
+      if (init?.method === 'POST') {
+        return new Response('duplicate key value violates unique constraint "users_email_key"', { status: 409 })
+      }
+      if (urlStr.includes('wallet_address=eq.')) {
+        return new Response(JSON.stringify(existingId ? [{ id: existingId }] : []), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+    const id = await deps.saveUser({
+      email: 'ben@purdue.edu',
+      name: 'Ben',
+      address: '0x1111111111111111111111111111111111111111',
+    })
+    assert.equal(id, 'user-race-1')
+
+    existingId = null
+    await assert.rejects(
+      async () =>
+        deps.saveUser({
+          email: 'ben@purdue.edu',
+          name: 'Ben',
+          address: '0x2222222222222222222222222222222222222222',
+        }),
+      /Supabase 409/,
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('getOrCreateOrg finds existing or creates new org', async () => {
   const originalFetch = globalThis.fetch
   try {

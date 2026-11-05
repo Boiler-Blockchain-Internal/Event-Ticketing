@@ -62,9 +62,22 @@ function useView(): { view: View | null; error: string | null } {
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     if (!ME_URL || !account.signedIn) return
+    let cancelled = false
+    setError(null)
     account.idToken().then(async token => {
-      const res = await fetch(ME_URL!, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      if (!token || cancelled) return
+      const [address, info] = await Promise.all([
+        account.address(),
+        account.userInfo(),
+      ])
+      if (cancelled) return
+      const res = await fetch(ME_URL!, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, email: info?.email, name: info?.name }),
+      })
       const body = await res.json().catch(() => ({}))
+      if (cancelled) return
       if (!res.ok) throw new Error(body.error ?? 'Something went wrong. Try again.')
       const name = body.user.name ?? body.user.email
       setView({
@@ -73,7 +86,10 @@ function useView(): { view: View | null; error: string | null } {
         history: body.passes.filter((p: PassInfo) => p.checkedInAt)
           .map((p: PassInfo) => ({ id: p.credentialId, name: p.name, org: p.org, date: day(p.checkedInAt)! })),
       })
-    }).catch(e => setError(e instanceof TypeError ? 'No connection · reload to retry' : e.message))
+    }).catch(e => {
+      if (!cancelled) setError(e instanceof TypeError ? 'No connection · reload to retry' : e.message)
+    })
+    return () => { cancelled = true }
   }, [account.signedIn])
   return { view, error }
 }
@@ -82,6 +98,12 @@ export function Tickets() {
   const account = useAccount()
   const [tab, setTab] = useState<'passes' | 'history'>('passes')
   const { view, error } = useView()
+
+  const handleSignOut = async () => {
+    await account.signOut()
+    window.location.hash = '#/redeem'
+    window.location.reload()
+  }
 
   if (account.ready && !account.signedIn) {
     return (
@@ -100,14 +122,14 @@ export function Tickets() {
         </a>
         <h1>My passes</h1>
         {view && (ME_URL
-          ? <button className="avatar" aria-label={`Sign out ${view.user.name}`} title="Sign out" onClick={() => account.signOut()}>{view.user.initials}</button>
+          ? <button className="avatar" aria-label={`Sign out ${view.user.name}`} title="Sign out" onClick={handleSignOut}>{view.user.initials}</button>
           : <span className="avatar" aria-label={view.user.name}>{view.user.initials}</span>)}
       </header>
 
       {error ? (
         <section className="intro">
           <p className="note" role="alert">{error}</p>
-          <button className="btn btn-primary btn-block" onClick={() => account.signOut().then(() => window.location.reload())}>
+          <button className="btn btn-primary btn-block" onClick={handleSignOut}>
             Sign out & retry
           </button>
         </section>
@@ -142,6 +164,11 @@ export function Tickets() {
               ))}
               {!view.history.length && <li><small>Events you check in to show up here.</small></li>}
             </ul>
+          )}
+          {ME_URL && (
+            <div style={{ marginTop: 'auto', textAlign: 'center', paddingTop: '1rem' }}>
+              <button className="link-btn" onClick={handleSignOut}>Sign out</button>
+            </div>
           )}
         </>
       )}
