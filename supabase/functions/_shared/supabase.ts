@@ -7,6 +7,31 @@ export type PassInfo = {
   name: string; org: string; startsAt: string | null; venue: string | null; checkedInAt: string | null
 }
 
+export type EventRecord = {
+  id: string
+  orgId: string
+  kind: 'event' | 'membership'
+  name: string
+  startsAt: string | null
+  doorsOpenAt: string | null
+  doorsCloseAt: string | null
+  venue: string | null
+  capacity: number | null
+}
+
+export type CreateEventInput = {
+  id: string
+  name: string
+  orgId?: string
+  orgName?: string
+  kind?: 'event' | 'membership'
+  startsAt?: string | null
+  doorsOpenAt?: string | null
+  doorsCloseAt?: string | null
+  venue?: string | null
+  capacity?: number | null
+}
+
 // Scan deps backed by Supabase PostgREST over plain fetch (works in Deno edge functions and Node).
 // Needs the service-role / secret key: server-side only, never ship it to the browser.
 export function supabaseDeps(url: string, serviceKey: string) {
@@ -71,6 +96,75 @@ export function supabaseDeps(url: string, serviceKey: string) {
         name: r.events.name, org: r.events.orgs.name, startsAt: r.events.starts_at, venue: r.events.venue,
         checkedInAt: r.checkins[0]?.checked_in_at ?? null,
       }))
+    },
+    async getOrCreateOrg(name = 'Boiler Blockchain'): Promise<string> {
+      const rows = await get(`orgs?name=eq.${encodeURIComponent(name)}&select=id`)
+      if (rows[0]?.id) return rows[0].id
+      const [created] = await get('orgs?select=id', {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'return=representation' },
+        body: JSON.stringify({ name }),
+      })
+      return created.id
+    },
+    async getEvent(id: string): Promise<EventRecord | null> {
+      const [e] = await get(
+        `events?id=eq.${encodeURIComponent(id)}&select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity`
+      )
+      if (!e) return null
+      return {
+        id: e.id,
+        orgId: e.org_id,
+        kind: e.kind,
+        name: e.name,
+        startsAt: e.starts_at,
+        doorsOpenAt: e.doors_open_at,
+        doorsCloseAt: e.doors_close_at,
+        venue: e.venue,
+        capacity: e.capacity,
+      }
+    },
+    async createEvent(input: CreateEventInput): Promise<EventRecord> {
+      if (!/^[A-Za-z0-9_-]+$/.test(input.id)) {
+        throw new Error('Event ID must only contain letters, numbers, underscores, and hyphens')
+      }
+      if (!input.name || !input.name.trim()) {
+        throw new Error('Event name is required')
+      }
+      if (input.capacity != null && (typeof input.capacity !== 'number' || input.capacity <= 0)) {
+        throw new Error('Capacity must be a positive number')
+      }
+      const orgId = input.orgId ?? (await this.getOrCreateOrg(input.orgName || 'Boiler Blockchain'))
+      const payload = {
+        id: input.id,
+        org_id: orgId,
+        kind: input.kind ?? 'event',
+        name: input.name.trim(),
+        starts_at: input.startsAt ?? null,
+        doors_open_at: input.doorsOpenAt ?? null,
+        doors_close_at: input.doorsCloseAt ?? null,
+        venue: input.venue ?? null,
+        capacity: input.capacity ?? null,
+      }
+      const [row] = await get(
+        'events?select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity',
+        {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'return=representation' },
+          body: JSON.stringify(payload),
+        }
+      )
+      return {
+        id: row.id,
+        orgId: row.org_id,
+        kind: row.kind,
+        name: row.name,
+        startsAt: row.starts_at,
+        doorsOpenAt: row.doors_open_at,
+        doorsCloseAt: row.doors_close_at,
+        venue: row.venue,
+        capacity: row.capacity,
+      }
     },
   }
 }
