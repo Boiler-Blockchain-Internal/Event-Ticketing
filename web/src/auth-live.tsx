@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { createWalletClient, custom } from 'viem'
 import { AUTH_CONNECTION, WALLET_CONNECTORS, WEB3AUTH_NETWORK } from '@web3auth/modal'
 import { useAuthTokenInfo, useWeb3Auth, useWeb3AuthConnect, useWeb3AuthDisconnect, Web3AuthProvider } from '@web3auth/modal/react'
@@ -9,6 +9,7 @@ import type { Signer } from '../../supabase/functions/_shared/pass.ts'
 // Devnet allows localhost; mainnet is for the deployed app. They give the same email different keys.
 const config = {
   web3AuthOptions: {
+    modalConfig: { hideWalletDiscovery: true },
     clientId: import.meta.env.VITE_WEB3AUTH_CLIENT_ID,
     web3AuthNetwork: import.meta.env.VITE_WEB3AUTH_NETWORK === 'mainnet' ? WEB3AUTH_NETWORK.SAPPHIRE_MAINNET : WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
   },
@@ -47,11 +48,18 @@ export function useLiveAccount(): Account {
   const { disconnect } = useWeb3AuthDisconnect()
   const { getAuthTokenInfo } = useAuthTokenInfo()
   const provider = connection?.ethereumProvider ?? web3Auth?.connection?.ethereumProvider
-  const client = useMemo(() => provider ? createWalletClient({ transport: custom(provider) }) : null, [provider])
-  const signer = useMemo<Signer | undefined>(() => {
-    if (!client) return
-    return { signMessage: async ({ message }) => client.signMessage({ account: (await client.getAddresses())[0], message }) }
-  }, [client])
+  // Resolve from the SDK at call time: the hook may still hold the pre-login provider.
+  const currentClient = () => {
+    const active = web3Auth?.connection?.ethereumProvider ?? provider
+    if (!active) throw new Error('Your account is still loading. Try again.')
+    return createWalletClient({ transport: custom(active) })
+  }
+  const signer: Signer = { signMessage: async ({ message }) => {
+    const active = currentClient()
+    const [address] = await active.getAddresses()
+    if (!address) throw new Error('Your account is still loading. Try again.')
+    return active.signMessage({ account: address, message })
+  } }
   const signedIn = isConnected || Boolean(web3Auth?.connected)
   return {
     ready: isInitialized,
@@ -59,7 +67,7 @@ export function useLiveAccount(): Account {
     signer,
     address: async () => {
       try {
-        return client ? (await client.getAddresses())[0] : null
+        return (await currentClient().getAddresses())[0] ?? null
       } catch {
         return null
       }

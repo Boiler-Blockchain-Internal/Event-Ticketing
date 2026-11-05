@@ -54,7 +54,9 @@ export async function verifyLogin(
   jwks = fetchJwks,
   clientBody?: LoginPayload,
 ): Promise<Login | null> {
-  const [h, p, s] = token.split('.')
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  const [h, p, s] = parts
   if (!h || !p || !s) {
     console.error('verifyLogin: token missing segments')
     return null
@@ -100,7 +102,7 @@ export async function verifyLogin(
 
     const nonEmpty = (s: unknown): string | null => (typeof s === 'string' && s.trim().length > 0 ? s.trim() : null)
 
-    const rawEmail = nonEmpty(c.email) || nonEmpty(c.verifierId) || nonEmpty(c.userId) || nonEmpty(clientBody?.email)
+    const rawEmail = nonEmpty(c.email) || nonEmpty(c.verifierId) || nonEmpty(c.userId)
     const email = rawEmail || (typeof c.sub === 'string' && c.sub.includes('@') ? c.sub.trim() : typeof c.sub === 'string' && c.sub.trim().length > 0 ? `${c.sub.trim()}@web3auth.user` : null)
     if (!email) {
       console.error('verifyLogin: missing email/user claim in payload', Object.keys(c))
@@ -130,13 +132,11 @@ export async function verifyLogin(
       }
     }
 
-    // Fallback: verified EVM wallet address passed from active wallet client
-    if (!address && typeof clientBody?.address === 'string' && /^0x[0-9a-fA-F]{40}$/.test(clientBody.address)) {
-      address = clientBody.address.toLowerCase() as Address
-    }
+    // Wallet ownership must come from the signed identity token, never request-body claims.
+    if (clientBody?.address && address && clientBody.address.toLowerCase() !== address.toLowerCase()) return null
 
     if (!address) {
-      console.error('verifyLogin: unable to resolve wallet address from token or client payload', { wallets: c.wallets, clientAddress: clientBody?.address })
+      console.error('verifyLogin: identity token does not contain a verified wallet')
       return null
     }
 

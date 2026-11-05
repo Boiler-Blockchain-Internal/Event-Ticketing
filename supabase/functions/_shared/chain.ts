@@ -144,7 +144,8 @@ export function createChainRelayer(
         args: [onChainId, targetIssuer],
       })
 
-      await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      if (receipt.status !== 'success') throw new Error('Event registration reverted')
       return { txHash, alreadyRegistered: false, onChainId }
     },
     async mintCredential(to: Address, slug: string, metadataHash: Hex) {
@@ -164,14 +165,18 @@ export function createChainRelayer(
       })
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      if (receipt.status !== 'success') throw new Error('Pass issuance reverted')
       const logs = parseEventLogs({
         abi: passmarkAbi,
         eventName: 'CredentialMinted',
         logs: receipt.logs,
       })
 
-      const mintedLog = logs.find(l => l.args.holder.toLowerCase() === to.toLowerCase())
-      const tokenId = mintedLog?.args.tokenId ? mintedLog.args.tokenId.toString() : '1'
+      const mintedLog = logs.find(l => l.address.toLowerCase() === contractAddress.toLowerCase()
+        && l.args.holder.toLowerCase() === to.toLowerCase() && l.args.eventId === onChainId
+        && l.args.metadataHash === metadataHash)
+      if (!mintedLog) throw new Error('Confirmed transaction did not contain the expected pass')
+      const tokenId = mintedLog.args.tokenId.toString()
 
       return { txHash, tokenId, onChainId }
     },

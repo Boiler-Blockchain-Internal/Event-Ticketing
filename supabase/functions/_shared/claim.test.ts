@@ -132,7 +132,7 @@ test('claimPass successfully mints on-chain and records credential in database',
   })
 })
 
-test('claimPass simulates credential ID when relayer is omitted', async () => {
+test('claimPass refuses to save a simulated credential when relayer is omitted', async () => {
   let savedId = ''
   const deps: ClaimDeps = {
     async saveUser() {
@@ -150,9 +150,7 @@ test('claimPass simulates credential ID when relayer is omitted', async () => {
     },
   }
 
-  const res = await claimPass('bb-fgm', mockLogin, deps, null)
-  assert.equal(res.status, 'minted')
-  assert.equal(res.credentialId, '6')
-  assert.equal(res.txHash, null)
-  assert.equal(savedId, '6')
+  await assert.rejects(claimPass('bb-fgm', mockLogin, deps, null),
+    (err: any) => err instanceof ClaimError && err.statusCode === 503)
+  assert.equal(savedId, '')
 })

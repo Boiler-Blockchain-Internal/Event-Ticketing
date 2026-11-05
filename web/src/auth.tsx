@@ -3,12 +3,14 @@ import type { Address, Hex } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import type { Signer } from '../../supabase/functions/_shared/pass.ts'
 
+const apiBase = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, '')
+
 // Live mode: MetaMask Embedded Wallets client ID + a Supabase project. Otherwise the local demo.
 export const ME_URL = import.meta.env.VITE_WEB3AUTH_CLIENT_ID && import.meta.env.VITE_SUPABASE_URL
-  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/me` : null
+  ? `${apiBase}/functions/v1/me` : null
 
 export const CLAIM_URL = import.meta.env.VITE_WEB3AUTH_CLIENT_ID && import.meta.env.VITE_SUPABASE_URL
-  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/claim` : null
+  ? `${apiBase}/functions/v1/claim` : null
 
 export type Account = {
   ready: boolean

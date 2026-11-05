@@ -10,6 +10,8 @@ import {
   DEFAULT_CONTRACT_ADDRESS,
   DEFAULT_RPC_URL,
 } from '../_shared/chain.ts'
+import { verifyLogin } from '../_shared/login.ts'
+import { isOrganizer } from '../_shared/organizer.ts'
 import { cors, json } from '../_shared/http.ts'
 import type { Address, Hex } from 'viem'
 
@@ -50,6 +52,16 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
+
+  const clientId = Deno.env.get('WEB3AUTH_CLIENT_ID')
+  if (!clientId) return json({ error: 'Sign-in is not configured' }, 503)
+  const token = req.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
+  const login = await verifyLogin(token, clientId, Date.now(), undefined, body)
+  if (!login) return json({ error: 'Sign in to create an event.' }, 401)
+  if (!isOrganizer(login.address, Deno.env.get('ORGANIZER_WALLET_ADDRESSES'))) {
+    return json({ error: 'Your account does not have organizer access.' }, 403)
+  }
+  if (!isValidPrivateKey(relayerKey)) return json({ error: 'Event issuing is not configured yet.' }, 503)
 
   const { id, name, kind, startsAt, doorsOpenAt, doorsCloseAt, venue, capacity, orgName, issuer } = body ?? {}
 
