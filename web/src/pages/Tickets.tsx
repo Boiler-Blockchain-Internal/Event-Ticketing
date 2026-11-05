@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Qr, useRotation } from '../components/Qr'
 import { event, history, membership, myTicket } from '../data'
-import { ME_URL, useAccount } from '../auth'
+import { ME_URL, useAccount, type Account } from '../auth'
 import { makePass, ticketLabel, type Signer } from '../../../supabase/functions/_shared/pass.ts'
 import type { PassInfo } from '../../../supabase/functions/_shared/supabase.ts'
 
-type View = { user: { name: string; initials: string }; passes: PassInfo[]; history: { id: string; name: string; org: string; date: string }[] }
+type View = { user: { name: string; initials: string; email?: string }; passes: PassInfo[]; history: { id: string; name: string; org: string; date: string }[] }
 
 const demoView: View = {
-  user: { name: myTicket.holder, initials: myTicket.initials },
+  user: { name: myTicket.holder, initials: myTicket.initials, email: 'priya@purdue.edu' },
   passes: [{
     credentialId: myTicket.id.replace(/\D/g, '').replace(/^0+/, ''), eventId: event.id, kind: 'event', status: 'active',
     name: event.name, org: event.org, startsAt: null, venue: event.venue, checkedInAt: null,
@@ -55,6 +55,48 @@ function PassCard({ pass, signer }: { pass: PassInfo; signer?: Signer }) {
   )
 }
 
+// Gray stand-in shaped like a pass while sign-in and the `me` call finish.
+function PassSkeleton() {
+  return (
+    <section className="ticket ticket-app skeleton" aria-busy="true" aria-label="Loading your passes">
+      <div className="sk" style={{ width: '40%' }} />
+      <div className="sk sk-title" />
+      <div className="sk" style={{ width: '70%' }} />
+      <div className="sk sk-qr" />
+      <div className="sk" style={{ width: '55%' }} />
+    </section>
+  )
+}
+
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`
+
+// Tapping the avatar opens this; signing out is a second, deliberate tap. Native popover handles Esc and tap-outside.
+function ProfileMenu({ user, account, onSignOut }: { user: View['user']; account: Account; onSignOut: () => void }) {
+  const [address, setAddress] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  useEffect(() => { account.address().then(setAddress, () => {}) }, [account.signedIn])
+  const copy = () => address && navigator.clipboard.writeText(address).then(() => {
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, () => {})
+  return (
+    <>
+      <button className="avatar" popoverTarget="profile-menu" aria-label={`Account menu for ${user.name}`}>{user.initials}</button>
+      <div id="profile-menu" popover="auto" className="profile-menu">
+        <b>{user.name}</b>
+        {user.email && user.email !== user.name && <small>{user.email}</small>}
+        {address && (
+          <div className="profile-id">
+            <span><small>Account ID</small><code>{short(address)}</code></span>
+            <button className="btn btn-ghost btn-sm" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+          </div>
+        )}
+        {ME_URL && <button className="btn btn-danger btn-block" onClick={onSignOut}>Sign out</button>}
+      </div>
+    </>
+  )
+}
+
 // Live: asks the `me` function for this attendee's passes. Demo: the mock pass.
 function useView(): { view: View | null; error: string | null } {
   const account = useAccount()
@@ -81,7 +123,7 @@ function useView(): { view: View | null; error: string | null } {
       if (!res.ok) throw new Error(body.error ?? 'Something went wrong. Try again.')
       const name = body.user.name ?? body.user.email
       setView({
-        user: { name, initials: initials(name) },
+        user: { name, initials: initials(name), email: body.user.email ?? info?.email },
         passes: body.passes.filter((p: PassInfo) => p.status === 'active'),
         history: body.passes.filter((p: PassInfo) => p.checkedInAt)
           .map((p: PassInfo) => ({ id: p.credentialId, name: p.name, org: p.org, date: day(p.checkedInAt)! })),
@@ -121,9 +163,7 @@ export function Tickets() {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>
         </a>
         <h1>My passes</h1>
-        {view && (ME_URL
-          ? <button className="avatar" aria-label={`Sign out ${view.user.name}`} title="Sign out" onClick={handleSignOut}>{view.user.initials}</button>
-          : <span className="avatar" aria-label={view.user.name}>{view.user.initials}</span>)}
+        {view && <ProfileMenu user={view.user} account={account} onSignOut={handleSignOut} />}
       </header>
 
       {error ? (
@@ -133,7 +173,7 @@ export function Tickets() {
             Sign out & retry
           </button>
         </section>
-      ) : !view ? <p className="note" aria-live="polite">Loading your passes…</p> : (
+      ) : !view ? <PassSkeleton /> : (
         <>
           <div className="segmented" role="tablist">
             <button role="tab" aria-selected={tab === 'passes'} onClick={() => setTab('passes')}>Passes</button>
@@ -164,11 +204,6 @@ export function Tickets() {
               ))}
               {!view.history.length && <li><small>Events you check in to show up here.</small></li>}
             </ul>
-          )}
-          {ME_URL && (
-            <div style={{ marginTop: 'auto', textAlign: 'center', paddingTop: '1rem' }}>
-              <button className="link-btn" onClick={handleSignOut}>Sign out</button>
-            </div>
           )}
         </>
       )}
