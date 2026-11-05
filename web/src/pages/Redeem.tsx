@@ -11,6 +11,15 @@ export function Redeem() {
   const [error, setError] = useState<string | null>(null)
   const [claiming, setClaiming] = useState(false)
 
+  const handleSignOut = async () => {
+    try {
+      await account.signOut()
+    } finally {
+      window.location.hash = '#/redeem'
+      window.location.reload()
+    }
+  }
+
   const claimAndNavigate = async () => {
     if (!CLAIM_URL) {
       navigate('/tickets')
@@ -19,12 +28,22 @@ export function Redeem() {
     setClaiming(true)
     setError(null)
     try {
-      const [token, address, info] = await Promise.all([
-        account.idToken(),
+      let token = await account.idToken()
+      if (!token) {
+        // Allow token to settle if called immediately after sign-in
+        for (let i = 0; i < 10 && !token; i++) {
+          await new Promise(r => setTimeout(r, 200))
+          token = await account.idToken()
+        }
+      }
+      if (!token) {
+        navigate('/tickets')
+        return
+      }
+      const [address, info] = await Promise.all([
         account.address(),
         account.userInfo(),
       ])
-      if (!token) throw new Error('Sign-in required to claim pass.')
       const res = await fetch(CLAIM_URL, {
         method: 'POST',
         headers: {
@@ -89,7 +108,7 @@ export function Redeem() {
             {claiming ? 'Setting up your pass…' : <>Claim this pass <Arrow /></>}
           </button>
           <a href="#/tickets" className="btn btn-ghost btn-block">View my passes</a>
-          <button className="link-btn" onClick={() => account.signOut().then(() => window.location.reload())}>Sign out</button>
+          <button className="link-btn" onClick={handleSignOut}>Sign out</button>
         </section>
       ) : sentTo ? (
         <section className="sent intro" aria-live="polite">
