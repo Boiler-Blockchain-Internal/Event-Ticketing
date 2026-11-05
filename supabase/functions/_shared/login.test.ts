@@ -67,14 +67,10 @@ test('rejects other projects, other issuers, expired, unknown keys and tampering
   assert.equal(await v('not.a.jwt'), null)
 })
 
-test('validates token with omitted wallets when client address payload is provided', async () => {
+test('rejects an unverified wallet submitted with a valid identity token', async () => {
   const tokenNoWallet = await token({ iss: ISSUER, aud: 'client-1', exp: now / 1000 + 600, sub: 'user_123', email: 'ben@purdue.edu' })
   const result = await verifyLogin(tokenNoWallet, 'client-1', now, jwks, { address: wallet.address, name: 'Ben H.' })
-  assert.deepEqual(result, {
-    email: 'ben@purdue.edu',
-    name: 'Ben H.',
-    address: wallet.address.toLowerCase(),
-  })
+  assert.equal(result, null)
 })
 
 test('validates token with verifierId fallback for email', async () => {
@@ -88,4 +84,15 @@ test('validates token with verifierId fallback for email', async () => {
     name: null,
     address: wallet.address.toLowerCase(),
   })
+})
+
+test('rejects a body address that differs from the verified wallet', async () => {
+  const stranger = privateKeyToAccount(generatePrivateKey())
+  assert.equal(await verifyLogin(await token(good), 'client-1', now, jwks, { address: stranger.address }), null)
+})
+test('ignores untrusted body email and rejects extra JWT segments', async () => {
+  const t = await token(good)
+  const login = await verifyLogin(t, 'client-1', now, jwks, { email: 'attacker@example.com' })
+  assert.equal(login?.email, 'priya@purdue.edu')
+  assert.equal(await verifyLogin(t + '.extra', 'client-1', now, jwks), null)
 })

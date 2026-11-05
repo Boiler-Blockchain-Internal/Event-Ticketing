@@ -18,7 +18,7 @@ const deps = supabaseUrl && supabaseKey ? supabaseDeps(supabaseUrl, supabaseKey)
 
 function getRelayer() {
   if (!isValidPrivateKey(relayerKey)) {
-    if (relayerKey) console.warn('DEPLOYER_PRIVATE_KEY is not a valid 32-byte hex; running in simulated mint mode')
+    console.warn('Pass issuing requires a configured relayer')
     return null
   }
   try {

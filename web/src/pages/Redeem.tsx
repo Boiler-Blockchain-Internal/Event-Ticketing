@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Arrow, Logo, Shield } from '../components/Logo'
 import { event } from '../data'
 import { navigate, routeParam } from '../router'
+import { session } from '../session'
 import { CLAIM_URL, ME_URL, useAccount } from '../auth'
 
 export function Redeem() {
@@ -29,22 +30,8 @@ export function Redeem() {
     setBusy('Setting up your pass…')
     setError(null)
     try {
-      let token = await account.idToken()
-      if (!token) {
-        // Allow token to settle if called immediately after sign-in
-        for (let i = 0; i < 10 && !token; i++) {
-          await new Promise(r => setTimeout(r, 200))
-          token = await account.idToken()
-        }
-      }
-      if (!token) {
-        navigate('/tickets')
-        return
-      }
-      const [address, info] = await Promise.all([
-        account.address(),
-        account.userInfo(),
-      ])
+      const { token, address } = await session(account)
+      const info = await account.userInfo()
       const res = await fetch(CLAIM_URL, {
         method: 'POST',
         headers: {
@@ -63,12 +50,12 @@ export function Redeem() {
     }
   }
 
-  // Live: MetaMask's sign-in window (Google, or a code sent to the email). Demo: lands on the demo pass.
+  // Sign-in creates/restores the embedded account. Claiming remains a separate explicit action.
   const signIn = (email?: string) => {
     setError(null)
     setBusy('Signing you in…')
     account.signIn(email).then(
-      () => claimAndNavigate(),
+      () => setBusy(null),
       () => { setBusy(null); setError("Sign-in didn't finish. Try again.") }
     )
   }
@@ -104,7 +91,7 @@ export function Redeem() {
       {account.signedIn ? (
         <section className="sent intro" aria-live="polite">
           <h2>You're signed in</h2>
-          <p className="muted">Your passes are ready in your account.</p>
+          <p className="muted">Your account is ready. Claim this pass when you’re ready.</p>
           {error && <p className="note" role="alert">{error}</p>}
           <button className="btn btn-primary btn-block" disabled={!!busy} onClick={claimAndNavigate}>
             {busy ? <><span className="spinner" aria-hidden="true" />{busy}</> : <>Claim this pass <Arrow /></>}

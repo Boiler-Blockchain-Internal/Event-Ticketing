@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { Arrow, Logo } from '../components/Logo'
+import { useAccount } from '../auth'
+import { session } from '../session'
 import { slugify } from '../slug.ts'
 
-// ponytail: #/admin is unguarded and the events function takes no auth; add an organizer check with role permissions (build step 7).
+// Organizer authorization is enforced by the backend wallet allowlist.
 const API = import.meta.env.VITE_SUPABASE_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/events` : null
 
 type Created = { event: { id: string; name: string }; claimPath: string; scanPath: string | null; txHash: string | null }
@@ -25,6 +27,7 @@ function CopyLink({ label, url }: { label: string; url: string }) {
 }
 
 export function Admin() {
+  const account = useAccount()
   const [name, setName] = useState('')
   const [id, setId] = useState<string | null>(null) // null = follow the name
   const [kind, setKind] = useState<'event' | 'membership'>('event')
@@ -51,9 +54,14 @@ export function Admin() {
       setCreated({ event: body, claimPath: `#/redeem?e=${encodeURIComponent(body.id)}`, scanPath: '#/scan?t=demo', txHash: null })
       return
     }
+    if (!account.signedIn) {
+      setError('Sign in to Passmark before creating an event.')
+      return
+    }
     setBusy(true)
     try {
-      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const { token, address } = await session(account)
+      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...body, address }) })
       const out = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(out.error ?? 'Could not create the event. Try again.')
       setCreated(out)
@@ -89,6 +97,7 @@ export function Admin() {
         <p className="eyebrow">Organizer</p>
         <h1 className="app-title">Create an event</h1>
       </div>
+      {API && !account.signedIn && <a className="btn btn-light" href="#/redeem">Sign in to Passmark</a>}
       <form className="form intro" style={{ '--i': 1 } as React.CSSProperties} onSubmit={submit}>
         <label htmlFor="name">Event name</label>
         <input id="name" required value={name} onChange={e => setName(e.target.value)} placeholder="Spring Kickoff" />

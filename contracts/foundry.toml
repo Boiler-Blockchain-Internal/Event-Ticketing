@@ -1,0 +1,13 @@
+[profile.default]
+src = "contracts"
+test = "forge-test"
+script = "script"
+out = "out"
+cache_path = "cache-forge"
+solc_version = "0.8.28"
+evm_version = "cancun"
+libs = ["node_modules", "../node_modules"]
+remappings = ["@openzeppelin/contracts/=../node_modules/@openzeppelin/contracts/"]
+
+[rpc_endpoints]
+base_sepolia = "https://sepolia.base.org"

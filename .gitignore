@@ -9,3 +9,7 @@ contracts/ignition/deployments/**/artifacts
 .env
 .env.local
 supabase/.temp
+
+contracts/out
+contracts/cache-forge
+contracts/broadcast

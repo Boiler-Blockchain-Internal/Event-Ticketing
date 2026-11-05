@@ -47,17 +47,8 @@ export async function claimPass(
   }
 
   const metadataHash = toMetadataHash(eventId, userId)
-  let credentialId: string
-  let txHash: Hash | null = null
-
-  if (relayer) {
-    const mintRes = await relayer.mintCredential(login.address, eventId, metadataHash)
-    credentialId = mintRes.tokenId
-    txHash = mintRes.txHash
-  } else {
-    // Simulated credential ID when relayer is not configured (e.g. tests or local mock)
-    credentialId = (info.activeCount + 1).toString()
-  }
+  if (!relayer) throw new ClaimError('Pass issuing is not configured yet. Contact the organizer.', 503)
+  const { tokenId: credentialId, txHash } = await relayer.mintCredential(login.address, eventId, metadataHash)
 
   await deps.saveCredential({
     id: credentialId,

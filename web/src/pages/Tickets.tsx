@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Qr, useRotation } from '../components/Qr'
 import { event, history, membership, myTicket } from '../data'
+import { session } from '../session'
 import { ME_URL, useAccount, type Account } from '../auth'
 import { makePass, ticketLabel, type Signer } from '../../../supabase/functions/_shared/pass.ts'
 import type { PassInfo } from '../../../supabase/functions/_shared/supabase.ts'
@@ -106,12 +107,8 @@ function useView(): { view: View | null; error: string | null } {
     if (!ME_URL || !account.signedIn) return
     let cancelled = false
     setError(null)
-    account.idToken().then(async token => {
-      if (!token || cancelled) return
-      const [address, info] = await Promise.all([
-        account.address(),
-        account.userInfo(),
-      ])
+    session(account).then(async ({ token, address }) => {
+      const info = await account.userInfo()
       if (cancelled) return
       const res = await fetch(ME_URL!, {
         method: 'POST',
