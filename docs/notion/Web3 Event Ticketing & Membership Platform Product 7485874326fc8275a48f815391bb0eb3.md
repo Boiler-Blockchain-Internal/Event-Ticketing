@@ -329,3 +329,5 @@ These are the decisions we need from leadership in the first two weeks, because 
 [Web3 - Tasks as of now](Web3%20Event%20Ticketing%20&%20Membership%20Platform%20Product/Web3%20-%20Tasks%20as%20of%20now%20ea45874326fc838ea2ca019c828e6052.md)
 
 [Plan - Yuvraj](Web3%20Event%20Ticketing%20&%20Membership%20Platform%20Product/Plan%20-%20Yuvraj%206385874326fc82718aa4817b7ec08951.md)
+
+
