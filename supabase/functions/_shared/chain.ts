@@ -3,6 +3,7 @@ import {
   createWalletClient,
   http,
   keccak256,
+  parseEventLogs,
   toHex,
   type Address,
   type Hash,
@@ -32,6 +33,27 @@ export const passmarkAbi = [
       { name: 'transferable', type: 'bool' },
     ],
   },
+  {
+    type: 'function',
+    name: 'mint',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'eventId', type: 'uint256' },
+      { name: 'metadataHash', type: 'bytes32' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'event',
+    name: 'CredentialMinted',
+    inputs: [
+      { name: 'tokenId', type: 'uint256', indexed: true },
+      { name: 'holder', type: 'address', indexed: true },
+      { name: 'eventId', type: 'uint256', indexed: true },
+      { name: 'metadataHash', type: 'bytes32', indexed: false },
+    ],
+  },
 ] as const
 
 export const DEFAULT_CONTRACT_ADDRESS = '0x256c1A87b79f28de3989cBf1742144E3Ca21705C' as Address
@@ -50,6 +72,11 @@ export function toChainEventId(slug: string): bigint {
   return BigInt(keccak256(toHex(slug)))
 }
 
+// Anchors off-chain event + holder identity without exposing personal info on-chain.
+export function toMetadataHash(slug: string, userId: string): Hex {
+  return keccak256(toHex(`${slug}:${userId}`))
+}
+
 export type ChainRelayer = {
   address: Address
   isEventRegistered(eventId: bigint): Promise<boolean>
@@ -57,6 +84,11 @@ export type ChainRelayer = {
     slug: string,
     issuer?: Address,
   ): Promise<{ txHash: Hash | null; alreadyRegistered?: boolean; onChainId: bigint }>
+  mintCredential(
+    to: Address,
+    slug: string,
+    metadataHash: Hex,
+  ): Promise<{ txHash: Hash; tokenId: string; onChainId: bigint }>
 }
 
 export function createChainRelayer(
@@ -114,6 +146,34 @@ export function createChainRelayer(
 
       await publicClient.waitForTransactionReceipt({ hash: txHash })
       return { txHash, alreadyRegistered: false, onChainId }
+    },
+    async mintCredential(to: Address, slug: string, metadataHash: Hex) {
+      const onChainId = toChainEventId(slug)
+
+      // Ensure the event is registered on-chain first so mint won't revert with UnknownEvent
+      const exists = await this.isEventRegistered(onChainId)
+      if (!exists) {
+        await this.registerEvent(slug, account.address)
+      }
+
+      const txHash = await walletClient.writeContract({
+        address: contractAddress,
+        abi: passmarkAbi,
+        functionName: 'mint',
+        args: [to, onChainId, metadataHash],
+      })
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const logs = parseEventLogs({
+        abi: passmarkAbi,
+        eventName: 'CredentialMinted',
+        logs: receipt.logs,
+      })
+
+      const mintedLog = logs.find(l => l.args.holder.toLowerCase() === to.toLowerCase())
+      const tokenId = mintedLog?.args.tokenId ? mintedLog.args.tokenId.toString() : '1'
+
+      return { txHash, tokenId, onChainId }
     },
   }
 }

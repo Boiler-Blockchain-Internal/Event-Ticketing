@@ -1,18 +1,74 @@
 import { useState, type FormEvent } from 'react'
 import { Arrow, Logo, Shield } from '../components/Logo'
 import { event } from '../data'
-import { navigate } from '../router'
-import { ME_URL, useAccount } from '../auth'
+import { navigate, routeParam } from '../router'
+import { CLAIM_URL, ME_URL, useAccount } from '../auth'
 
 export function Redeem() {
   const account = useAccount()
+  const eventId = routeParam('e') || event.id
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [claiming, setClaiming] = useState(false)
+
+  const handleSignOut = async () => {
+    try {
+      await account.signOut()
+    } finally {
+      window.location.hash = '#/redeem'
+      window.location.reload()
+    }
+  }
+
+  const claimAndNavigate = async () => {
+    if (!CLAIM_URL) {
+      navigate('/tickets')
+      return
+    }
+    setClaiming(true)
+    setError(null)
+    try {
+      let token = await account.idToken()
+      if (!token) {
+        // Allow token to settle if called immediately after sign-in
+        for (let i = 0; i < 10 && !token; i++) {
+          await new Promise(r => setTimeout(r, 200))
+          token = await account.idToken()
+        }
+      }
+      if (!token) {
+        navigate('/tickets')
+        return
+      }
+      const [address, info] = await Promise.all([
+        account.address(),
+        account.userInfo(),
+      ])
+      const res = await fetch(CLAIM_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ eventId, address, email: info?.email, name: info?.name }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error ?? 'Failed to claim pass. Try again.')
+      navigate('/tickets')
+    } catch (err: any) {
+      setError(err instanceof TypeError ? 'No connection · reload to retry' : err?.message || 'Something went wrong.')
+    } finally {
+      setClaiming(false)
+    }
+  }
 
   // Live: MetaMask's sign-in window (Google, or a code sent to the email). Demo: lands on the demo pass.
   const signIn = (email?: string) => {
     setError(null)
-    account.signIn(email).then(() => navigate('/tickets'), () => setError("Sign-in didn't finish. Try again."))
+    account.signIn(email).then(
+      () => claimAndNavigate(),
+      () => setError("Sign-in didn't finish. Try again.")
+    )
   }
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -47,8 +103,12 @@ export function Redeem() {
         <section className="sent intro" aria-live="polite">
           <h2>You're signed in</h2>
           <p className="muted">Your passes are ready in your account.</p>
-          <a href="#/tickets" className="btn btn-primary btn-block">View my passes <Arrow /></a>
-          <button className="link-btn" onClick={() => account.signOut().then(() => window.location.reload())}>Sign out</button>
+          {error && <p className="note" role="alert">{error}</p>}
+          <button className="btn btn-primary btn-block" disabled={claiming} onClick={claimAndNavigate}>
+            {claiming ? 'Setting up your pass…' : <>Claim this pass <Arrow /></>}
+          </button>
+          <a href="#/tickets" className="btn btn-ghost btn-block">View my passes</a>
+          <button className="link-btn" onClick={handleSignOut}>Sign out</button>
         </section>
       ) : sentTo ? (
         <section className="sent intro" aria-live="polite">

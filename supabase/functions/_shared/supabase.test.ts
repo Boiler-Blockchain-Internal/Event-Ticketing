@@ -172,6 +172,92 @@ test('handles PostgREST error responses by throwing descriptive error', async ()
   }
 })
 
+test('claimInfo parses event, calculates active count and identifies existing holder credential', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = String(url)
+      if (urlStr.includes('id=eq.bb-fgm')) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: 'bb-fgm',
+              name: 'Fall General Meeting',
+              capacity: 120,
+              credentials: [
+                { id: '101', holder_id: 'user-1', status: 'active' },
+                { id: '102', holder_id: 'user-2', status: 'active' },
+                { id: '103', holder_id: 'user-3', status: 'revoked' },
+              ],
+            },
+          ]),
+          { status: 200 },
+        )
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+
+    // User-1 already has an active credential
+    const info1 = await deps.claimInfo('bb-fgm', 'user-1')
+    assert.deepEqual(info1, {
+      event: { id: 'bb-fgm', name: 'Fall General Meeting', capacity: 120 },
+      activeCount: 2,
+      existingCredentialId: '101',
+    })
+
+    // User-new has no existing active credential
+    const infoNew = await deps.claimInfo('bb-fgm', 'user-new')
+    assert.deepEqual(infoNew, {
+      event: { id: 'bb-fgm', name: 'Fall General Meeting', capacity: 120 },
+      activeCount: 2,
+      existingCredentialId: null,
+    })
+
+    // Missing event
+    const infoMissing = await deps.claimInfo('missing', 'user-1')
+    assert.deepEqual(infoMissing, {
+      event: null,
+      activeCount: 0,
+      existingCredentialId: null,
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('saveCredential posts correct credential mirror record', async () => {
+  const originalFetch = globalThis.fetch
+  try {
+    let capturedBody = ''
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      assert.match(String(url), /credentials/)
+      assert.equal(init?.method, 'POST')
+      capturedBody = String(init?.body)
+      return new Response(null, { status: 201 })
+    }) as typeof fetch
+
+    const deps = supabaseDeps('https://example.supabase.co', 'sb_secret_test')
+    await deps.saveCredential({
+      id: '150',
+      eventId: 'bb-fgm',
+      holderId: 'user-uuid-xyz',
+      metadataHash: '0xhash123',
+    })
+
+    assert.deepEqual(JSON.parse(capturedBody), {
+      id: '150',
+      event_id: 'bb-fgm',
+      holder_id: 'user-uuid-xyz',
+      status: 'active',
+      metadata_hash: '0xhash123',
+    })
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('passesFor disambiguates events relationship and maps passes', async () => {
   const originalFetch = globalThis.fetch
   try {
