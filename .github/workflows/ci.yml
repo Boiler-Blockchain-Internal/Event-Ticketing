@@ -24,3 +24,8 @@ jobs:
         run: npm test -w web
       - name: Typecheck and build web app
         run: npm run build -w web
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: End-to-end tests (demo mode)
+        run: npm run test:e2e -w web

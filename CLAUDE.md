@@ -14,7 +14,7 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 - `web/`: Vite + React 19 + TypeScript SPA. **Not Next.js** (the Notion doc says Next.js; the repo chose Vite).
   - `src/router.ts`: hash routing via `useSyncExternalStore`. No react-router.
   - `src/data.ts`: mock data, stands in until the backend and contract exist.
-  - `src/verify.ts`: door-side scan check. Local stand-in for the real backend check.
+  - `src/demoScan.ts`: demo door with no staff link: real signed codes through the real `checkScan`, storage in memory.
   - `src/auth.tsx`: `useAccount()`: MetaMask Embedded Wallets login + signer when `VITE_WEB3AUTH_CLIENT_ID` and `VITE_SUPABASE_URL` are set, else a demo key. The SDK lives in `src/auth-live.tsx` and is imported only in live mode (it prefetches MetaMask's frame on import).
   - `src/pages/`, `src/components/`: screens and UI pieces (`Qr.tsx`, `HeroTicket.tsx`, `Logo.tsx`).
 - `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `login.ts` MetaMask ID-token check (ES256 via WebCrypto) and wallet address; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
@@ -36,12 +36,13 @@ npm run compile        # hardhat compile contracts
 npm test -w contracts  # hardhat unit tests (11 tests)
 npm test -w web        # unit tests, web + server (node:test runs .ts directly, Node 23.6+)
 npm run build -w web   # typecheck and build web app
+npm run test:e2e -w web # Playwright core flows in demo mode (local: installed Edge)
 ```
 
 ## Conventions
 
 - TypeScript strict, `noUnusedLocals`, `noUnusedParameters`. Imports use explicit `.ts` extensions.
-- Tests: `node:test` + `node:assert/strict`, colocated as `*.test.ts`. No Jest or Vitest.
+- Tests: `node:test` + `node:assert/strict`, colocated as `*.test.ts`. No Jest or Vitest. End-to-end: Playwright in `web/e2e/`.
 - Minimal dependencies. Prefer the platform (native camera API, CSS) before adding a package.
 - Deliberate shortcuts get a `ponytail:` comment naming the ceiling and the upgrade path.
 - Scan results are exactly three states: green `admit`, amber `repeat` (shows first check-in time), red `invalid` (plain-language reason).
@@ -66,7 +67,7 @@ npm run build -w web   # typecheck and build web app
 3. Email/Google sign-in with embedded wallet; platform-sponsored mint.
 4. Admin: create event / membership tier; issue by CSV and capped claim link.
 5. Attendee: ticket/member card with rotating signed QR.
-6. Staff scan page: camera scan, replace `verify.ts` mock with the server check.
+6. Staff scan page: camera scan, server check (done; demo mode runs the same check in memory).
 7. Attendance log + CSV export; admin revoke/reissue; role permissions.
 
 Out of scope: payments, resale/marketplace, multi-chain, native apps. Stretch only after the Month 2 gate: offline allowlist, Apple/Google Wallet passes, external wallet linking, transfers, analytics.
