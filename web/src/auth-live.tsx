@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useRef, type ReactNode } from 'react'
 import { createWalletClient, custom } from 'viem'
 import { AUTH_CONNECTION, WALLET_CONNECTORS, WEB3AUTH_NETWORK } from '@web3auth/modal'
 import { useAuthTokenInfo, useWeb3Auth, useWeb3AuthConnect, useWeb3AuthDisconnect, Web3AuthProvider } from '@web3auth/modal/react'
@@ -9,6 +9,8 @@ import type { Signer } from '../../supabase/functions/_shared/pass.ts'
 // Devnet allows localhost; mainnet is for the deployed app. They give the same email different keys.
 const config = {
   web3AuthOptions: {
+    // Attendees only ever use the embedded account; don't list browser wallets.
+    modalConfig: { hideWalletDiscovery: true },
     clientId: import.meta.env.VITE_WEB3AUTH_CLIENT_ID,
     web3AuthNetwork: import.meta.env.VITE_WEB3AUTH_NETWORK === 'mainnet' ? WEB3AUTH_NETWORK.SAPPHIRE_MAINNET : WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
   },
@@ -46,20 +48,31 @@ export function useLiveAccount(): Account {
   const { connectTo } = useWeb3AuthConnect()
   const { disconnect } = useWeb3AuthDisconnect()
   const { getAuthTokenInfo } = useAuthTokenInfo()
-  const provider = connection?.ethereumProvider ?? web3Auth?.connection?.ethereumProvider
-  const client = useMemo(() => provider ? createWalletClient({ transport: custom(provider) }) : null, [provider])
-  const signer = useMemo<Signer | undefined>(() => {
-    if (!client) return
-    return { signMessage: async ({ message }) => client.signMessage({ account: (await client.getAddresses())[0], message }) }
-  }, [client])
   const signedIn = isConnected || Boolean(web3Auth?.connected)
+  // Resolve the provider when called, not at render: right after the modal finishes, the hook state
+  // can still hold the pre-login (empty) provider while the SDK instance already has the new one.
+  const hookProvider = useRef(connection?.ethereumProvider)
+  hookProvider.current = connection?.ethereumProvider
+  const client = () => {
+    const provider = web3Auth?.connection?.ethereumProvider ?? hookProvider.current
+    return provider ? createWalletClient({ transport: custom(provider) }) : null
+  }
+  // Stable while signed in, so the pass QR effect doesn't re-run every render.
+  const signer = useMemo<Signer | undefined>(() => signedIn ? {
+    signMessage: async ({ message }) => {
+      const c = client()
+      const [account] = c ? await c.getAddresses() : []
+      if (!c || !account) throw new Error('Your account is still loading. Try again.')
+      return c.signMessage({ account, message })
+    },
+  } : undefined, [signedIn, web3Auth])
   return {
     ready: isInitialized,
     signedIn,
     signer,
     address: async () => {
       try {
-        return client ? (await client.getAddresses())[0] : null
+        return (await client()?.getAddresses())?.[0] ?? null
       } catch {
         return null
       }
