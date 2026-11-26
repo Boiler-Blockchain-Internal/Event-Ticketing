@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { event, myTicket } from '../data'
+import { event } from '../data'
 import { routeParam } from '../router'
-import { verify, type ScanResult } from '../verify'
+import { demoScanner } from '../demoScan'
+import type { ScanResult } from '../../../supabase/functions/_shared/pass.ts'
 import type { EventSummary } from '../../../supabase/functions/_shared/supabase.ts'
-
-// Demo codes cycled by "Simulate scan" until real passes exist: admit, admit, repeat, revoked, wrong event.
-const demoCodes = ['#0142', '#0141', '#0142', '#0131'].map(t => `passmark:${event.id}:${t}`).concat('passmark:other:#0137')
 
 // Live mode: a staff link (#/scan?t=...) plus a configured Supabase project. Otherwise the local demo.
 const API = import.meta.env.VITE_SUPABASE_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan` : null
@@ -25,13 +23,12 @@ async function post(token: string, code?: string): Promise<{ event: EventSummary
 export function Scan() {
   const token = useRef(routeParam('t')).current
   const live = !!(API && token)
-  const checkins = useRef(new Map<string, string>())
+  const demoDoor = useRef(live ? null : demoScanner()).current
   const [head, setHead] = useState({ name: event.name, capacity: event.capacity as number | null })
   const [count, setCount] = useState(live ? 0 : event.claimed)
   const [linkError, setLinkError] = useState<string | null>(null)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [camera, setCamera] = useState(false)
-  const demo = useRef(0)
   const video = useRef<HTMLVideoElement>(null)
   const busy = useRef(false) // ignore frames while a request is in flight or a result is on screen
 
@@ -53,14 +50,14 @@ export function Scan() {
         const res = await post(token!, code)
         showEvent(res.event)
         r = res.result!
-        if (r.kind === 'repeat') r = { ...r, at: clock(new Date(r.at)) }
       } catch (e) {
         r = { kind: 'invalid', reason: e instanceof TypeError ? 'No connection · scan again' : (e as Error).message }
       }
     } else {
-      r = verify(code, checkins.current, clock())
+      r = await demoDoor!.check(code)
       if (r.kind === 'admit') setCount(c => c + 1)
     }
+    if (r.kind === 'repeat') r = { ...r, at: clock(new Date(r.at)) }
     setResult(r)
     navigator.vibrate?.(r.kind === 'admit' ? 80 : [60, 60, 60])
   }
@@ -132,13 +129,13 @@ export function Scan() {
           )}
         </section>
       ) : !live && (
-        <button className="btn btn-ghost btn-block" onClick={() => handle(demoCodes[demo.current++ % demoCodes.length])}>
+        <button className="btn btn-ghost btn-block" onClick={async () => handle(await demoDoor!.simulate())}>
           Simulate scan
         </button>
       )}
 
       <button className="btn btn-light btn-block scan-next" onClick={next} disabled={!result}>Scan next</button>
-      {!live && <p className="note mono">Demo: try pass {myTicket.id} twice to see a repeat scan.</p>}
+      {!live && <p className="note mono">Demo: Simulate scan cycles admit, repeat and rejected passes.</p>}
     </main>
   )
 }
