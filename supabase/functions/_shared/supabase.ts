@@ -22,6 +22,7 @@ export type EventRecord = {
   doorsCloseAt: string | null
   venue: string | null
   capacity: number | null
+  org?: string | null // org name; set by getEvent
 }
 
 export type CreateEventInput = {
@@ -142,10 +143,11 @@ export function supabaseDeps(url: string, serviceKey: string) {
     },
     async getEvent(id: string): Promise<EventRecord | null> {
       const [e] = await get(
-        `events?id=eq.${encodeURIComponent(id)}&select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity`
+        `events?id=eq.${encodeURIComponent(id)}&select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity,orgs(name)`
       )
       if (!e) return null
       return {
+        org: e.orgs?.name ?? null,
         id: e.id,
         orgId: e.org_id,
         kind: e.kind,

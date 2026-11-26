@@ -465,6 +465,7 @@ test('getEvent fetches and maps event by id', async () => {
               doors_close_at: null,
               venue: 'Lawson B155',
               capacity: 120,
+              orgs: { name: 'Boiler Blockchain' },
             },
           ]),
           { status: 200 },
@@ -480,6 +481,7 @@ test('getEvent fetches and maps event by id', async () => {
     assert.equal(event.id, 'bb-fgm')
     assert.equal(event.name, 'Fall General Meeting')
     assert.equal(event.capacity, 120)
+    assert.equal(event.org, 'Boiler Blockchain')
 
     const missing = await deps.getEvent('does-not-exist')
     assert.equal(missing, null)

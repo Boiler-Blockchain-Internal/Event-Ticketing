@@ -33,8 +33,8 @@ Deno.serve(async (req: Request) => {
     try {
       const event = await deps.getEvent(id)
       if (!event) return json({ error: 'Event not found' }, 404)
-      const summary = await deps.eventSummary(id)
-      return json({ event, summary, onChainId: toChainEventId(id).toString() })
+      const [summary, { activeCount }] = await Promise.all([deps.eventSummary(id), deps.claimInfo(id, '')])
+      return json({ event, summary, claimed: activeCount, onChainId: toChainEventId(id).toString() })
     } catch (e) {
       console.error(e)
       return json({ error: 'Failed to fetch event' }, 502)
