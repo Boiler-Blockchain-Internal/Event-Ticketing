@@ -1,4 +1,4 @@
-// POST /functions/v1/events  -> creates event in Postgres & registers on Base Sepolia, returns claim & staff links
+// POST /functions/v1/events  (Bearer MetaMask ID token, organizers only) -> creates event in Postgres & registers on Base Sepolia, returns claim & staff links
 // GET  /functions/v1/events?id=<id> -> returns public event details & attendance summary
 // JWT verification is off for this function (config.toml).
 import { supabaseDeps, type CreateEventInput } from '../_shared/supabase.ts'
@@ -10,6 +10,8 @@ import {
   DEFAULT_CONTRACT_ADDRESS,
   DEFAULT_RPC_URL,
 } from '../_shared/chain.ts'
+import { verifyLogin } from '../_shared/login.ts'
+import { isOrganizer } from '../_shared/organizer.ts'
 import { cors, json } from '../_shared/http.ts'
 import type { Address, Hex } from 'viem'
 
@@ -49,6 +51,17 @@ Deno.serve(async (req: Request) => {
     body = await req.json()
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
+  }
+
+  // Organizers only (ORGANIZER_EMAILS). The email must come from the verified token, never the body.
+  const clientId = Deno.env.get('WEB3AUTH_CLIENT_ID')
+  if (!clientId) return json({ error: 'Sign-in is not set up yet' }, 500)
+  const token = req.headers.get('authorization')?.replace(/^Bearer /, '') ?? ''
+  const address = typeof body?.address === 'string' ? body.address : undefined
+  const login = await verifyLogin(token, clientId, Date.now(), undefined, { address })
+  if (!login) return json({ error: 'Sign in to create an event.' }, 401)
+  if (!isOrganizer(login.email, Deno.env.get('ORGANIZER_EMAILS'))) {
+    return json({ error: 'Your account does not have organizer access.' }, 403)
   }
 
   const { id, name, kind, startsAt, doorsOpenAt, doorsCloseAt, venue, capacity, orgName, issuer } = body ?? {}

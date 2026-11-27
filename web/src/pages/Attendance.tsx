@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Arrow, Logo } from '../components/Logo'
+import { OrganizerSignIn } from '../components/OrganizerSignIn'
 import { attendees as demoAttendees, event } from '../data'
 import { routeParam } from '../router'
 import { ME_URL, useAccount } from '../auth'
@@ -52,7 +53,6 @@ export function Attendance() {
   const account = useAccount()
   const [eventId, setEventId] = useState(routeParam('e'))
   const [reload, setReload] = useState(0)
-  const [signingIn, setSigningIn] = useState(false)
   const { sheet, error } = useSheet(eventId, account.signedIn, reload)
 
   const pick = (e: FormEvent<HTMLFormElement>) => {
@@ -60,10 +60,6 @@ export function Attendance() {
     const id = (new FormData(e.currentTarget).get('event') as string).trim()
     history.replaceState(null, '', `#/attendance?e=${encodeURIComponent(id)}`) // shareable, without a route change
     setEventId(id)
-  }
-  const signIn = (email?: string) => {
-    setSigningIn(true)
-    account.signIn(email).finally(() => setSigningIn(false))
   }
 
   if (API && !eventId) return (
@@ -78,21 +74,7 @@ export function Attendance() {
     </main>
   )
 
-  if (API && !account.signedIn) return (
-    <main className="app">
-      <Logo />
-      <div className="intro"><p className="eyebrow">Organizer</p><h1 className="app-title">Sign in to see attendance</h1></div>
-      <div className="intro">
-        <button className="btn btn-light btn-block" disabled={!account.ready || signingIn} onClick={() => signIn()}>Continue with Google</button>
-        <p className="or"><span>or</span></p>
-        <form className="email-form" onSubmit={e => { e.preventDefault(); signIn(new FormData(e.currentTarget).get('email') as string) }}>
-          <label htmlFor="email">Organizer email</label>
-          <input id="email" name="email" type="email" required placeholder="you@purdue.edu" autoComplete="email" />
-          <button className="btn btn-primary btn-block" disabled={!account.ready || signingIn}>Email me a sign-in code <Arrow /></button>
-        </form>
-      </div>
-    </main>
-  )
+  if (API && !account.signedIn) return <OrganizerSignIn title="Sign in to see attendance" />
 
   const rows = sheet?.rows ?? []
   const active = rows.filter(r => r.status === 'active')
