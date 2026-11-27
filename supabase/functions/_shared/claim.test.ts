@@ -98,6 +98,8 @@ test('claimPass successfully mints on-chain and records credential in database',
 
   const mockRelayer: ChainRelayer = {
     address: '0xrelayer' as Address,
+    revokeCredential: async () => assert.fail('not used by claims'),
+    reissueCredential: async () => assert.fail('not used by claims'),
     async isEventRegistered() {
       return true
     },

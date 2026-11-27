@@ -134,6 +134,21 @@ export function supabaseDeps(url: string, serviceKey: string) {
         }),
       })
     },
+    async credentialRow(id: string): Promise<{ eventId: string; status: 'active' | 'revoked'; metadataHash: string | null } | null> {
+      const [c] = await get(`credentials?id=eq.${id}&select=event_id,status,metadata_hash`)
+      return c ? { eventId: c.event_id, status: c.status, metadataHash: c.metadata_hash } : null
+    },
+    async userByEmail(email: string): Promise<{ id: string; wallet: string | null } | null> {
+      const [u] = await get(`users?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=id,wallet_address`)
+      return u ? { id: u.id, wallet: u.wallet_address } : null
+    },
+    async markRevoked(id: string, reissuedAs?: string): Promise<void> {
+      await get(`credentials?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'revoked', reissued_as: reissuedAs ?? null }),
+      })
+    },
     async getOrCreateOrg(name = 'Boiler Blockchain'): Promise<string> {
       const rows = await get(`orgs?name=eq.${encodeURIComponent(name)}&select=id`)
       if (rows[0]?.id) return rows[0]?.id
