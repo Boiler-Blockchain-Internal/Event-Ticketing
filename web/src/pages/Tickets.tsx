@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Qr, useRotation } from '../components/Qr'
 import { event, history, membership, myTicket } from '../data'
 import { ME_URL, useAccount, type Account } from '../auth'
+import { session } from '../session'
+import { day, initials } from '../eventCard'
 import { makePass, ticketLabel, type Signer } from '../../../supabase/functions/_shared/pass.ts'
 import type { PassInfo } from '../../../supabase/functions/_shared/supabase.ts'
 
@@ -11,13 +13,10 @@ const demoView: View = {
   user: { name: myTicket.holder, initials: myTicket.initials, email: 'priya@purdue.edu' },
   passes: [{
     credentialId: myTicket.id.replace(/\D/g, '').replace(/^0+/, ''), eventId: event.id, kind: 'event', status: 'active',
-    name: event.name, org: event.org, startsAt: null, venue: event.venue, checkedInAt: null,
+    name: event.name, org: event.org, startsAt: '2026-11-12T19:00:00-05:00', venue: event.venue, checkedInAt: null,
   }],
   history,
 }
-
-const day = (iso: string | null) => iso ? new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : null
-const initials = (s: string) => s.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
 
 // Fresh signed code every rotation, and again when the phone wakes (a backgrounded tab may hold an expired one).
 function usePassCode(signer: Signer | undefined, credentialId: string, eventId: string, version: number) {
@@ -38,7 +37,7 @@ function PassCard({ pass, signer }: { pass: PassInfo; signer?: Signer }) {
   const { label, version } = useRotation()
   const code = usePassCode(signer, pass.credentialId, pass.eventId, version)
   const id = ticketLabel(pass.credentialId)
-  const date = pass.startsAt ? day(pass.startsAt) : event.shortDate
+  const date = day(pass.startsAt) // no start time set: the date is left out, not borrowed from mock data
   return (
     <section className="ticket ticket-app">
       <div className="ticket-top"><span>{pass.kind === 'membership' ? 'MEMBER CARD' : 'EVENT TICKET'}</span><span>{id}</span></div>
@@ -106,12 +105,8 @@ function useView(): { view: View | null; error: string | null } {
     if (!ME_URL || !account.signedIn) return
     let cancelled = false
     setError(null)
-    account.idToken().then(async token => {
-      if (!token || cancelled) return
-      const [address, info] = await Promise.all([
-        account.address(),
-        account.userInfo(),
-      ])
+    session(account).then(async ({ token, address }) => {
+      const info = await account.userInfo()
       if (cancelled) return
       const res = await fetch(ME_URL!, {
         method: 'POST',

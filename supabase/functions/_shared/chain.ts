@@ -45,6 +45,32 @@ export const passmarkAbi = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    type: 'function',
+    name: 'revoke',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'reissue',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'newHolder', type: 'address' },
+    ],
+    outputs: [{ name: 'newTokenId', type: 'uint256' }],
+  },
+  {
+    type: 'event',
+    name: 'CredentialReissued',
+    inputs: [
+      { name: 'oldTokenId', type: 'uint256', indexed: true },
+      { name: 'newTokenId', type: 'uint256', indexed: true },
+      { name: 'newHolder', type: 'address', indexed: true },
+    ],
+  },
+  {
     type: 'event',
     name: 'CredentialMinted',
     inputs: [
@@ -89,6 +115,8 @@ export type ChainRelayer = {
     slug: string,
     metadataHash: Hex,
   ): Promise<{ txHash: Hash; tokenId: string; onChainId: bigint }>
+  revokeCredential(tokenId: string): Promise<{ txHash: Hash }>
+  reissueCredential(tokenId: string, to: Address): Promise<{ txHash: Hash; newTokenId: string }>
 }
 
 export function createChainRelayer(
@@ -174,6 +202,24 @@ export function createChainRelayer(
       const tokenId = mintedLog?.args.tokenId ? mintedLog.args.tokenId.toString() : '1'
 
       return { txHash, tokenId, onChainId }
+    },
+    async revokeCredential(tokenId: string) {
+      const txHash = await walletClient.writeContract({
+        address: contractAddress, abi: passmarkAbi, functionName: 'revoke', args: [BigInt(tokenId)],
+      })
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      if (receipt.status !== 'success') throw new Error(`revoke transaction failed: ${txHash}`)
+      return { txHash }
+    },
+    async reissueCredential(tokenId: string, to: Address) {
+      const txHash = await walletClient.writeContract({
+        address: contractAddress, abi: passmarkAbi, functionName: 'reissue', args: [BigInt(tokenId), to],
+      })
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      if (receipt.status !== 'success') throw new Error(`reissue transaction failed: ${txHash}`)
+      const [log] = parseEventLogs({ abi: passmarkAbi, eventName: 'CredentialReissued', logs: receipt.logs })
+      if (!log) throw new Error(`reissue succeeded but no CredentialReissued event: ${txHash}`)
+      return { txHash, newTokenId: log.args.newTokenId.toString() }
     },
   }
 }

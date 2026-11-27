@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Arrow, Logo } from '../components/Logo'
+import { OrganizerSignIn } from '../components/OrganizerSignIn'
+import { ME_URL, useAccount } from '../auth'
+import { session } from '../session'
 import { slugify } from '../slug.ts'
 
-// ponytail: #/admin is unguarded and the events function takes no auth; add an organizer check with role permissions (build step 7).
-const API = import.meta.env.VITE_SUPABASE_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/events` : null
+// Live: organizers sign in; the events function checks ORGANIZER_EMAILS. Demo: no backend, links only.
+const API = ME_URL ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/events` : null
 
 type Created = { event: { id: string; name: string }; claimPath: string; scanPath: string | null; txHash: string | null }
 
@@ -25,6 +28,7 @@ function CopyLink({ label, url }: { label: string; url: string }) {
 }
 
 export function Admin() {
+  const account = useAccount()
   const [name, setName] = useState('')
   const [id, setId] = useState<string | null>(null) // null = follow the name
   const [kind, setKind] = useState<'event' | 'membership'>('event')
@@ -53,7 +57,12 @@ export function Admin() {
     }
     setBusy(true)
     try {
-      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const { token, address } = await session(account)
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, address }),
+      })
       const out = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(out.error ?? 'Could not create the event. Try again.')
       setCreated(out)
@@ -66,6 +75,8 @@ export function Admin() {
 
   const reset = () => { setCreated(null); setName(''); setId(null); setKind('event') }
 
+  if (API && !account.signedIn) return <OrganizerSignIn title="Sign in to create an event" />
+
   if (created) return (
     <main className="app">
       <Logo />
@@ -77,6 +88,7 @@ export function Admin() {
           ? <CopyLink label="Door link · for scanning staff only, expires in 14 days" url={fullUrl(created.scanPath)} />
           : <p className="note" role="alert">No door link: STAFF_LINK_SECRET isn't set on the server.</p>}
         {created.txHash && <a className="link-btn" href={`https://sepolia.basescan.org/tx/${created.txHash}`} target="_blank" rel="noreferrer">View registration on Basescan</a>}
+        <a className="btn btn-ghost btn-block" href={`#/attendance?e=${encodeURIComponent(created.event.id)}`}>View attendance</a>
         <button className="btn btn-primary btn-block" onClick={reset}>Create another</button>
       </section>
     </main>

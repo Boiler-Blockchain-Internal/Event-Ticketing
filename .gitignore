@@ -9,3 +9,5 @@ contracts/ignition/deployments/**/artifacts
 .env
 .env.local
 supabase/.temp
+test-results
+playwright-report

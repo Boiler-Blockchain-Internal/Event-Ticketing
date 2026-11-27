@@ -20,8 +20,10 @@ If code and that doc disagree, the code wins for *how*, the doc wins for *what*.
 - `supabase/functions/_shared/`: code shared by edge functions and the web app (imported by relative path). `pass.ts` rotating signed QR payload; `scan.ts` door check; `staff.ts` scoped staff-link token; `login.ts` MetaMask ID-token check (ES256 via WebCrypto) and wallet address; `supabase.ts` PostgREST deps over fetch. Runs in Node (tests) and Deno.
 - `supabase/functions/scan/`: the scan edge function (`verify_jwt = false` in `config.toml`; the staff token is the auth).
 - `supabase/functions/me/`: saves the signed-in attendee + wallet, returns their passes (`verify_jwt = false`; MetaMask's ID token is the auth). Needs `WEB3AUTH_CLIENT_ID`.
-- `supabase/functions/events/`: creates events in Postgres and registers on Base Sepolia (`verify_jwt = false`). Returns claim and staff scan URLs.
+- `supabase/functions/events/`: creates events in Postgres and registers on Base Sepolia (`verify_jwt = false`). POST is organizers only (`ORGANIZER_EMAILS`, same check as attendance). Returns claim and staff scan URLs.
 - `supabase/functions/claim/`: attendee pass claim and platform-sponsored minting on Base Sepolia (`verify_jwt = false`). Needs `DEPLOYER_PRIVATE_KEY` and `WEB3AUTH_CLIENT_ID`.
+- `supabase/functions/attendance/`: organizer-only attendee list for an event (`verify_jwt = false`). Organizers are `ORGANIZER_EMAILS`, matched against the token's email only (`_shared/organizer.ts`). The web screen is `#/attendance?e=<id>`, CSV built in the browser (`web/src/csv.ts`).
+- `scripts/revoke.ts`: revoke a pass or reissue it to another signed-in attendee (contract + Postgres); logic in `_shared/revoke.ts`.
 - `scripts/staff-link.ts`: prints a door-staff link until the admin dashboard exists.
 - `supabase/migrations/`: Postgres schema, RLS, and the atomic `check_in` function.
 - `contracts/`: Hardhat 3 + viem (not Foundry), OpenZeppelin v5 ERC-721 + ERC-5192 (`contracts/contracts/Passmark.sol`), Hardhat Ignition module (`ignition/modules/Passmark.ts`), deployed to Base Sepolia at `0x256c1A87b79f28de3989cBf1742144E3Ca21705C` (chain ID 84532), 11 unit tests (`test/Passmark.ts`).

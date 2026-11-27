@@ -6,6 +6,9 @@ export type PassInfo = {
   credentialId: string; eventId: string; kind: 'event' | 'membership'; status: 'active' | 'revoked'
   name: string; org: string; startsAt: string | null; venue: string | null; checkedInAt: string | null
 }
+export type AttendanceRow = {
+  credentialId: string; status: 'active' | 'revoked'; name: string | null; email: string | null; checkedInAt: string | null
+}
 export type ClaimTarget = {
   event: { id: string; name: string; capacity: number | null } | null
   activeCount: number
@@ -22,6 +25,7 @@ export type EventRecord = {
   doorsCloseAt: string | null
   venue: string | null
   capacity: number | null
+  org?: string | null // org name; set by getEvent
 }
 
 export type CreateEventInput = {
@@ -130,6 +134,21 @@ export function supabaseDeps(url: string, serviceKey: string) {
         }),
       })
     },
+    async credentialRow(id: string): Promise<{ eventId: string; status: 'active' | 'revoked'; metadataHash: string | null } | null> {
+      const [c] = await get(`credentials?id=eq.${id}&select=event_id,status,metadata_hash`)
+      return c ? { eventId: c.event_id, status: c.status, metadataHash: c.metadata_hash } : null
+    },
+    async userByEmail(email: string): Promise<{ id: string; wallet: string | null } | null> {
+      const [u] = await get(`users?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=id,wallet_address`)
+      return u ? { id: u.id, wallet: u.wallet_address } : null
+    },
+    async markRevoked(id: string, reissuedAs?: string): Promise<void> {
+      await get(`credentials?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify({ status: 'revoked', reissued_as: reissuedAs ?? null }),
+      })
+    },
     async getOrCreateOrg(name = 'Boiler Blockchain'): Promise<string> {
       const rows = await get(`orgs?name=eq.${encodeURIComponent(name)}&select=id`)
       if (rows[0]?.id) return rows[0]?.id
@@ -140,12 +159,22 @@ export function supabaseDeps(url: string, serviceKey: string) {
       })
       return created.id
     },
+    // Every pass issued for the event (revoked ones included), with holder and check-in time.
+    async attendance(eventId: string): Promise<AttendanceRow[]> {
+      const rows = await get(`credentials?event_id=eq.${encodeURIComponent(eventId)}&order=id.asc` +
+        '&select=id::text,status,users(name,email),checkins(checked_in_at)')
+      return rows.map((r: any) => ({
+        credentialId: r.id, status: r.status, name: r.users?.name ?? null, email: r.users?.email ?? null,
+        checkedInAt: r.checkins?.[0]?.checked_in_at ?? null,
+      }))
+    },
     async getEvent(id: string): Promise<EventRecord | null> {
       const [e] = await get(
-        `events?id=eq.${encodeURIComponent(id)}&select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity`
+        `events?id=eq.${encodeURIComponent(id)}&select=id,org_id,kind,name,starts_at,doors_open_at,doors_close_at,venue,capacity,orgs(name)`
       )
       if (!e) return null
       return {
+        org: e.orgs?.name ?? null,
         id: e.id,
         orgId: e.org_id,
         kind: e.kind,
