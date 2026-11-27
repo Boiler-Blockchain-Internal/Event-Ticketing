@@ -489,3 +489,26 @@ test('getEvent fetches and maps event by id', async () => {
     globalThis.fetch = originalFetch
   }
 })
+
+test('attendance lists every pass for the event with holder and check-in time', async () => {
+  const originalFetch = globalThis.fetch
+  let requested = ''
+  try {
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      requested = String(url)
+      return new Response(JSON.stringify([
+        { id: '141', status: 'active', users: { name: 'Marcus L.', email: 'marcus@purdue.edu' }, checkins: [{ checked_in_at: '2026-11-12T19:02:00Z' }] },
+        { id: '142', status: 'revoked', users: { name: null, email: 'priya@purdue.edu' }, checkins: [] },
+      ]), { status: 200 })
+    }) as typeof fetch
+
+    const rows = await supabaseDeps('https://example.supabase.co', 'sb_secret_test').attendance('bb-fgm')
+    assert.match(requested, /credentials\?event_id=eq\.bb-fgm/)
+    assert.deepEqual(rows, [
+      { credentialId: '141', status: 'active', name: 'Marcus L.', email: 'marcus@purdue.edu', checkedInAt: '2026-11-12T19:02:00Z' },
+      { credentialId: '142', status: 'revoked', name: null, email: 'priya@purdue.edu', checkedInAt: null },
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

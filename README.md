@@ -34,6 +34,7 @@ npm test -w contracts  # hardhat unit tests (11 tests)
    - `STAFF_LINK_SECRET`: Same shared secret passphrase as above.
    - `WEB3AUTH_CLIENT_ID`: Same client ID as `VITE_WEB3AUTH_CLIENT_ID` (required for `/functions/v1/me` and `/functions/v1/claim` ID token verification).
    - `DEPLOYER_PRIVATE_KEY`: Platform admin relayer key on Base Sepolia for on-chain event registration and sponsored minting (`/functions/v1/events` and `/functions/v1/claim`).
+   - `ORGANIZER_EMAILS`: Comma-separated sign-in emails allowed to see attendance (`/functions/v1/attendance`). Empty means nobody.
    - `PASSMARK_CONTRACT_ADDRESS`: (Optional) Contract address (defaults to `0x256c1A87b79f28de3989cBf1742144E3Ca21705C`).
 4. Generate an expiring door-staff scan link:
    ```bash

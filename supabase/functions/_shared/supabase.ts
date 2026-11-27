@@ -6,6 +6,9 @@ export type PassInfo = {
   credentialId: string; eventId: string; kind: 'event' | 'membership'; status: 'active' | 'revoked'
   name: string; org: string; startsAt: string | null; venue: string | null; checkedInAt: string | null
 }
+export type AttendanceRow = {
+  credentialId: string; status: 'active' | 'revoked'; name: string | null; email: string | null; checkedInAt: string | null
+}
 export type ClaimTarget = {
   event: { id: string; name: string; capacity: number | null } | null
   activeCount: number
@@ -140,6 +143,15 @@ export function supabaseDeps(url: string, serviceKey: string) {
         body: JSON.stringify({ name }),
       })
       return created.id
+    },
+    // Every pass issued for the event (revoked ones included), with holder and check-in time.
+    async attendance(eventId: string): Promise<AttendanceRow[]> {
+      const rows = await get(`credentials?event_id=eq.${encodeURIComponent(eventId)}&order=id.asc` +
+        '&select=id::text,status,users(name,email),checkins(checked_in_at)')
+      return rows.map((r: any) => ({
+        credentialId: r.id, status: r.status, name: r.users?.name ?? null, email: r.users?.email ?? null,
+        checkedInAt: r.checkins?.[0]?.checked_in_at ?? null,
+      }))
     },
     async getEvent(id: string): Promise<EventRecord | null> {
       const [e] = await get(

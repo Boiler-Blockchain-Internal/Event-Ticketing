@@ -14,3 +14,7 @@ verify_jwt = false
 # Attendee pass claim & sponsored minting relayer
 [functions.claim]
 verify_jwt = false
+
+# Organizer attendance list; checks MetaMask's token and the ORGANIZER_EMAILS allowlist itself
+[functions.attendance]
+verify_jwt = false

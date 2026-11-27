@@ -77,6 +77,7 @@ export function Admin() {
           ? <CopyLink label="Door link · for scanning staff only, expires in 14 days" url={fullUrl(created.scanPath)} />
           : <p className="note" role="alert">No door link: STAFF_LINK_SECRET isn't set on the server.</p>}
         {created.txHash && <a className="link-btn" href={`https://sepolia.basescan.org/tx/${created.txHash}`} target="_blank" rel="noreferrer">View registration on Basescan</a>}
+        <a className="btn btn-ghost btn-block" href={`#/attendance?e=${encodeURIComponent(created.event.id)}`}>View attendance</a>
         <button className="btn btn-primary btn-block" onClick={reset}>Create another</button>
       </section>
     </main>

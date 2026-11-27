@@ -5,6 +5,7 @@ import { Redeem } from './pages/Redeem'
 import { Tickets } from './pages/Tickets'
 import { Scan } from './pages/Scan'
 import { Admin } from './pages/Admin'
+import { Attendance } from './pages/Attendance'
 
 const pages: Record<string, () => React.JSX.Element> = {
   '/': Landing,
@@ -12,6 +13,7 @@ const pages: Record<string, () => React.JSX.Element> = {
   '/tickets': Tickets,
   '/scan': Scan,
   '/admin': Admin,
+  '/attendance': Attendance,
 }
 
 export default function App() {
